@@ -1,0 +1,39 @@
+---
+title: "Quickstart"
+description: "Install the RISI scaffold and run its deterministic smoke check"
+---
+
+## Prerequisites
+
+- Python 3.11, 3.12, or 3.13
+- [uv](https://docs.astral.sh/uv/)
+
+## Install from source
+
+```bash
+git clone https://github.com/q-uestionable-AI/RISI.git
+cd RISI
+uv sync --locked --group dev
+```
+
+## Confirm the CLI
+
+```bash
+uv run risi --help
+uv run risi version
+uv run risi smoke
+```
+
+## Run verification
+
+```bash
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy src/risi/
+uv run pytest -q
+```
+
+<Note>
+The initial scaffold defines contracts and documentation only. It does not yet implement an attack,
+database, model integration, or experimental evidence pipeline.
+</Note>

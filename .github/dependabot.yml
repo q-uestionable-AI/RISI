@@ -1,0 +1,16 @@
+# Proactive updates are limited to GitHub Actions. Python vulnerability coverage comes from
+# Dependabot security updates plus pip-audit in CI; routine dependency updates remain
+# release-aligned and intentional.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    commit-message:
+      prefix: "ci"
+    groups:
+      actions:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 5

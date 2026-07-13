@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/q-uestionable-AI/RISI/schemas/event.schema.json",
+  "title": "RISI experimental event",
+  "description": "Ordered tamper-evident event emitted by a RISI experimental component.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "episode_id",
+    "sequence",
+    "logical_time",
+    "event_type",
+    "actor_principal_id",
+    "visibility",
+    "state_hash_before",
+    "state_hash_after",
+    "previous_event_hash",
+    "event_hash",
+    "payload"
+  ],
+  "properties": {
+    "event_id": { "type": "string", "minLength": 1 },
+    "episode_id": { "type": "string", "minLength": 1 },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "logical_time": { "type": "integer", "minimum": 0 },
+    "event_type": {
+      "enum": [
+        "memory_read",
+        "read_side_update",
+        "retrieval_set_change",
+        "critical_memory_suppression",
+        "admission_decision",
+        "deduplication_decision",
+        "consolidation",
+        "eviction",
+        "archive",
+        "trial_reset",
+        "state_hash",
+        "invariant_violation",
+        "decision"
+      ]
+    },
+    "actor_principal_id": { "type": ["string", "null"] },
+    "visibility": { "enum": ["attacker", "evaluator", "both"] },
+    "state_hash_before": { "$ref": "#/$defs/hash" },
+    "state_hash_after": { "$ref": "#/$defs/hash" },
+    "previous_event_hash": {
+      "oneOf": [
+        { "$ref": "#/$defs/hash" },
+        { "type": "null" }
+      ]
+    },
+    "event_hash": { "$ref": "#/$defs/hash" },
+    "payload": { "type": "object" }
+  },
+  "$defs": {
+    "hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  }
+}

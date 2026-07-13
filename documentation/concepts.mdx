@@ -1,0 +1,40 @@
+---
+title: "Core Concepts"
+description: "RISI, RISI-C, CRAF, memory eclipsing, and their security boundaries"
+---
+
+## Retrieval-Induced State Interference
+
+**RISI** is a proposed mechanism class in which an authorized retrieval changes shared or
+future-relevant memory state, such as salience, recency, access count, cache state, consolidation
+state, or retention eligibility.
+
+A state change alone is not a confidentiality result.
+
+## RISI-C
+
+**RISI-C** is the measurable confidentiality failure in which an authorized but untrusted observer
+distinguishes hidden retrieval activity through retrieval-induced adaptive state. Primary evidence
+must use observations legitimately visible to the attacker.
+
+## Critical Recall Availability Failure
+
+**CRAF** is a proposed failure class in which a valid, applicable critical memory is absent from
+decision context or is not applied after a bounded truth-preserving adversarial trace. The attacker
+does not corrupt, contradict, directly delete, or directly access the protected memory.
+
+## Memory eclipsing
+
+**Memory eclipsing** is the proposed attack family that makes a valid critical memory unavailable
+or behaviorally inert through competition or memory-control-plane dynamics while preserving truth.
+
+## CAAF
+
+Critical Admission Availability Failure is an exploratory admission-stage failure. Core CRAF begins
+with an existing legitimate memory, so CAAF cannot establish headline CRAF.
+
+## Relationship to CTPF
+
+RISI is conceptually distinct from qai's Capability Trust Propagation Failure work. CTPF studies
+trust or capability crossing authority boundaries; RISI studies read-induced state, and CRAF studies
+continued availability of applicable critical memory.
