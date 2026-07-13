@@ -20,7 +20,8 @@ must never be copied into this repository.
 
 - Use synthetic scenarios and lab-controlled or explicitly authorized systems only.
 - Never connect decision outputs to live consequential systems.
-- Keep RISI/CRAF conceptually separate from qai's Capability Trust Propagation Failure work.
+- Keep RISI/CRAF conceptually separate from the CTPF Research Harness and its Capability Trust
+  Propagation Failure work.
 - Treat CAAF as exploratory and separate from core CRAF.
 - Do not describe hypotheses or proposed terminology as validated findings.
 - Keep evaluator-only truth, criticality, and applicability oracles outside target-visible state.
