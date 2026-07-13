@@ -32,7 +32,7 @@ consequential production systems.
 
 ## Development
 
-RISI follows the same release-aligned Python development framework used by qai.
+RISI follows the same release-aligned Python development framework used by CTPF Research Harness.
 
 ```bash
 uv sync --locked --group dev
