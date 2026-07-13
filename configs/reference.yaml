@@ -1,0 +1,22 @@
+schema_version: 1
+engine:
+  name: reference
+  deterministic: true
+  logical_clock:
+    initial_value: 0
+  random_seed: 0
+policy:
+  retrieval: pure_read
+  capacity: 100
+  top_k: 5
+  read_side_updates: false
+  consolidation: disabled
+  eviction: fifo
+telemetry:
+  hash_chain: true
+  capture_candidates: true
+  capture_context: true
+  separate_attacker_and_evaluator_views: true
+storage:
+  backend: placeholder
+  disposable_per_trial: true

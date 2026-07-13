@@ -1,0 +1,51 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "almond",
+  "name": "RISI",
+  "colors": {
+    "primary": "#0891b2",
+    "light": "#0e7490",
+    "dark": "#22d3ee"
+  },
+  "topbarLinks": [
+    {
+      "name": "GitHub",
+      "url": "https://github.com/q-uestionable-AI/RISI"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Get Started",
+    "url": "/quickstart"
+  },
+  "navigation": {
+    "groups": [
+      {
+        "group": "Getting Started",
+        "pages": [
+          "introduction",
+          "quickstart",
+          "concepts",
+          "responsible-use",
+          "changelog"
+        ]
+      },
+      {
+        "group": "Architecture",
+        "pages": ["architecture/overview"]
+      }
+    ]
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/q-uestionable-AI/RISI",
+      "website": "https://richardspicer.io"
+    }
+  },
+  "metadata": {
+    "og:site_name": "RISI Documentation",
+    "og:description": "Retrieval-induced adaptive state and critical recall availability research"
+  },
+  "search": {
+    "placeholder": "Search RISI docs..."
+  }
+}

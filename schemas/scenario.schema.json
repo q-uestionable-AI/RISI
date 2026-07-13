@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/q-uestionable-AI/RISI/schemas/scenario.schema.json",
+  "title": "RISI scenario",
+  "description": "Synthetic paired-episode scenario contract for RISI and CRAF research.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "scenario_id",
+    "domain",
+    "phenomenon",
+    "world_state",
+    "principals",
+    "initial_memories",
+    "evaluator_only",
+    "attacker_model",
+    "seeds"
+  ],
+  "properties": {
+    "scenario_id": { "type": "string", "minLength": 1 },
+    "domain": { "type": "string", "minLength": 1 },
+    "phenomenon": { "enum": ["risi", "craf", "combined"] },
+    "world_state": { "type": "object" },
+    "principals": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/principal" }
+    },
+    "initial_memories": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/memory" }
+    },
+    "evaluator_only": { "$ref": "#/$defs/evaluatorOnly" },
+    "baseline_history": { "type": "array", "items": { "type": "object" } },
+    "attacker_model": { "$ref": "#/$defs/attackerModel" },
+    "risi": { "$ref": "#/$defs/risiCondition" },
+    "craf": { "$ref": "#/$defs/crafCondition" },
+    "nuisance_factors": { "type": "object" },
+    "seeds": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "integer", "minimum": 0 },
+      "uniqueItems": true
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "phenomenon": { "const": "risi" } } },
+      "then": { "required": ["risi"] }
+    },
+    {
+      "if": { "properties": { "phenomenon": { "const": "craf" } } },
+      "then": { "required": ["craf"] }
+    },
+    {
+      "if": { "properties": { "phenomenon": { "const": "combined" } } },
+      "then": { "required": ["risi", "craf"] }
+    }
+  ],
+  "$defs": {
+    "principal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["principal_id", "role", "tenant_id"],
+      "properties": {
+        "principal_id": { "type": "string", "minLength": 1 },
+        "role": { "enum": ["trusted", "victim", "attacker", "decision"] },
+        "tenant_id": { "type": "string", "minLength": 1 }
+      }
+    },
+    "memory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "memory_id",
+        "content",
+        "owner",
+        "source",
+        "provenance",
+        "access_policy",
+        "validity_interval"
+      ],
+      "properties": {
+        "memory_id": { "type": "string", "minLength": 1 },
+        "content": { "type": "string", "minLength": 1 },
+        "owner": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 },
+        "provenance": { "type": "object" },
+        "access_policy": { "type": "array", "items": { "type": "string" } },
+        "system_criticality": { "type": ["string", "null"] },
+        "validity_interval": { "type": "object" },
+        "semantic_variants": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "evaluatorOnly": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["memory_oracles"],
+      "properties": {
+        "memory_oracles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["memory_id", "oracle_criticality", "oracle_applicability"],
+            "properties": {
+              "memory_id": { "type": "string" },
+              "oracle_criticality": { "type": "boolean" },
+              "oracle_applicability": { "type": "object" }
+            }
+          }
+        }
+      }
+    },
+    "attackerModel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allowed_operations", "budget", "truth_constraints"],
+      "properties": {
+        "allowed_operations": { "type": "array", "items": { "type": "string" } },
+        "budget": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "interactions",
+            "input_tokens",
+            "admitted_memories",
+            "elapsed_logical_time"
+          ],
+          "properties": {
+            "interactions": { "type": "integer", "minimum": 0 },
+            "input_tokens": { "type": "integer", "minimum": 0 },
+            "admitted_memories": { "type": "integer", "minimum": 0 },
+            "elapsed_logical_time": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "truth_constraints": { "type": "object" }
+      }
+    },
+    "risiCondition": {
+      "type": "object",
+      "required": [
+        "candidate_topics",
+        "initialized_candidate_memories",
+        "victim_event",
+        "attacker_observation_schema"
+      ],
+      "properties": {
+        "candidate_topics": { "type": "array", "items": { "type": "string" } },
+        "initialized_candidate_memories": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "victim_event": { "type": "object" },
+        "attacker_observation_schema": { "type": "object" }
+      }
+    },
+    "crafCondition": {
+      "type": "object",
+      "required": ["protected_memory_ids", "suppressor_candidates", "final_decision"],
+      "properties": {
+        "protected_memory_ids": { "type": "array", "items": { "type": "string" } },
+        "suppressor_candidates": { "type": "array", "items": { "type": "object" } },
+        "final_decision": { "type": "object" }
+      }
+    }
+  }
+}

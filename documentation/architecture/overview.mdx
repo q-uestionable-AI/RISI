@@ -1,0 +1,41 @@
+---
+title: "Architecture Overview"
+description: "Initial RISI package boundaries and future reference-engine shape"
+---
+
+## Scaffold architecture
+
+The initial package establishes a typed adapter boundary, target-visible memory models, scenario and
+event schemas, and a deterministic CLI smoke check. Persistence and experimental behavior are
+deliberately absent.
+
+```text
+Synthetic scenario world
+        |
+Trace and budget controller (future)
+        |
+Memory adapter contract
+        |
+Deterministic reference engine (future)
+        |
+Simulated decision layer (future)
+        |
+Tamper-evident event and replay pipeline (future)
+```
+
+## Visibility boundary
+
+Target-visible memory state must never contain evaluator-only truth, criticality, applicability, or
+safe-action oracles. Adapters may expose complete state through `inspect_state`, but only to the
+evaluator.
+
+## Recall stages
+
+Critical recall is decomposed into existence, retrieval, context inclusion, and behavioral
+application. Each stage will be instrumented independently so a model error cannot be mistaken for
+a storage or retrieval failure.
+
+## Current limitations
+
+The reference engine, snapshots, hash chain, replay, truth validator, attacks, defenses, external
+adapters, and statistical analysis are future gated work.

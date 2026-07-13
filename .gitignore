@@ -1,0 +1,35 @@
+# Python environments and caches
+.venv/
+.uv-cache/
+.uv-python/
+__pycache__/
+*.py[cod]
+.mypy_cache/
+.pip-audit-cache/
+.pre-commit-cache/
+.pytest_cache/
+.ruff_cache/
+
+# Coverage and build output
+.coverage
+coverage.xml
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Experiment output must never be committed
+artifacts/

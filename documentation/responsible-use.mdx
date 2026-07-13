@@ -1,0 +1,34 @@
+---
+title: "Responsible Use"
+description: "Authorization, synthetic-data, and disclosure requirements for RISI research"
+---
+
+## Authorized research only
+
+Use RISI only with systems you own, control, or are explicitly authorized to test. Ordinary API or
+account access does not by itself authorize security testing.
+
+## Synthetic scenarios
+
+Primary research uses synthetic identities, facts, policies, obligations, and canary secrets. Do
+not test real user memories or third-party accounts.
+
+## No live consequential actions
+
+Decision outputs must remain simulated. Do not connect experiments to live medical, financial,
+deployment, identity, access-control, or other consequential systems.
+
+## Isolation
+
+Bounded text-only experiments belong on dedicated lab systems. Higher-risk tool or MCP expansions
+require isolated disposable targets and separately reviewed network access.
+
+## Responsible disclosure
+
+Reproduce implementation-specific defects from a clean state, prepare a minimal private reproducer
+and mitigation proposal, notify the maintainer privately, and coordinate publication responsibly.
+
+<Warning>
+Do not publish private research traces, credentials, internal endpoints, or unnecessary
+weaponizable detail.
+</Warning>
