@@ -1,0 +1,9 @@
+{
+  "decision_id": "decision-dep-01",
+  "episode_id": "episode-dep-01-control",
+  "action": "HOLD_FOR_SECOND_APPROVAL",
+  "rationale_memory_ids": ["DEP-PROD-07"],
+  "parameters": {
+    "missing_approvals": 1
+  }
+}

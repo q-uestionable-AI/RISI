@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/q-uestionable-AI/RISI/schemas/state.schema.json",
+  "title": "RISI full target-state snapshot",
+  "description": "Complete deterministic target state used for evaluator-controlled reset and replay.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "snapshot_version",
+    "episode",
+    "logical_time",
+    "next_event_sequence",
+    "source_memories",
+    "derived_state",
+    "indexes",
+    "queues",
+    "policy",
+    "policy_state"
+  ],
+  "properties": {
+    "snapshot_version": { "type": "integer", "minimum": 1 },
+    "episode": { "$ref": "#/$defs/episode" },
+    "logical_time": { "type": "integer", "minimum": 0 },
+    "next_event_sequence": { "type": "integer", "minimum": 0 },
+    "source_memories": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/memory" }
+    },
+    "derived_state": { "$ref": "#/$defs/jsonObject" },
+    "indexes": { "$ref": "#/$defs/jsonObject" },
+    "queues": { "$ref": "#/$defs/jsonObject" },
+    "policy": { "$ref": "#/$defs/policy" },
+    "policy_state": { "$ref": "#/$defs/jsonObject" }
+  },
+  "$defs": {
+    "episode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scenario_id", "episode_id", "seed"],
+      "properties": {
+        "scenario_id": { "type": "string", "minLength": 1 },
+        "episode_id": { "type": "string", "minLength": 1 },
+        "seed": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "memory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "memory_id",
+        "scenario_id",
+        "tenant_id",
+        "owner_id",
+        "source_id",
+        "content",
+        "access_policy",
+        "logical_created_at",
+        "logical_valid_from",
+        "logical_valid_until",
+        "system_criticality",
+        "state",
+        "metadata"
+      ],
+      "properties": {
+        "memory_id": { "type": "string", "minLength": 1 },
+        "scenario_id": { "type": "string", "minLength": 1 },
+        "tenant_id": { "type": "string", "minLength": 1 },
+        "owner_id": { "type": "string", "minLength": 1 },
+        "source_id": { "type": "string", "minLength": 1 },
+        "content": { "type": "string", "minLength": 1 },
+        "access_policy": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "logical_created_at": { "type": "integer", "minimum": 0 },
+        "logical_valid_from": { "type": "integer", "minimum": 0 },
+        "logical_valid_until": { "type": ["integer", "null"], "minimum": 0 },
+        "system_criticality": { "type": ["string", "null"] },
+        "state": { "enum": ["current", "superseded", "hidden", "archived", "deleted"] },
+        "metadata": { "$ref": "#/$defs/jsonObject" }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "settings"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "settings": { "$ref": "#/$defs/jsonObject" }
+      }
+    },
+    "jsonObject": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/jsonValue" }
+    },
+    "jsonValue": {
+      "oneOf": [
+        { "type": ["string", "number", "integer", "boolean", "null"] },
+        { "type": "array", "items": { "$ref": "#/$defs/jsonValue" } },
+        {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/jsonValue" }
+        }
+      ]
+    }
+  }
+}

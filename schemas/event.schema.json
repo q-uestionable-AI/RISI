@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/q-uestionable-AI/RISI/schemas/event.schema.json",
   "title": "RISI experimental event",
-  "description": "Ordered tamper-evident event emitted by a RISI experimental component.",
+  "description": "Ordered tamper-evident event emitted by a deterministic RISI component.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -26,9 +26,14 @@
     "logical_time": { "type": "integer", "minimum": 0 },
     "event_type": {
       "enum": [
+        "episode_started",
+        "policy_configured",
+        "memory_ingested",
         "memory_read",
         "read_side_update",
+        "retrieval_completed",
         "retrieval_set_change",
+        "context_assembled",
         "critical_memory_suppression",
         "admission_decision",
         "deduplication_decision",
@@ -38,10 +43,12 @@
         "trial_reset",
         "state_hash",
         "invariant_violation",
-        "decision"
+        "decision",
+        "oracle_evaluated",
+        "episode_completed"
       ]
     },
-    "actor_principal_id": { "type": ["string", "null"] },
+    "actor_principal_id": { "type": ["string", "null"], "minLength": 1 },
     "visibility": { "enum": ["attacker", "evaluator", "both"] },
     "state_hash_before": { "$ref": "#/$defs/hash" },
     "state_hash_after": { "$ref": "#/$defs/hash" },
@@ -52,12 +59,26 @@
       ]
     },
     "event_hash": { "$ref": "#/$defs/hash" },
-    "payload": { "type": "object" }
+    "payload": { "$ref": "#/$defs/jsonObject" }
   },
   "$defs": {
     "hash": {
       "type": "string",
       "pattern": "^[a-f0-9]{64}$"
+    },
+    "jsonObject": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/jsonValue" }
+    },
+    "jsonValue": {
+      "oneOf": [
+        { "type": ["string", "number", "integer", "boolean", "null"] },
+        { "type": "array", "items": { "$ref": "#/$defs/jsonValue" } },
+        {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/jsonValue" }
+        }
+      ]
     }
   }
 }

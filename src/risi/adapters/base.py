@@ -2,14 +2,23 @@
 
 from abc import ABC, abstractmethod
 
-from risi.models import JsonValue, MemoryRecord, RetrievalQuery, RetrievalResult
-
-StateSnapshot = dict[str, JsonValue]
-TraceEvent = dict[str, JsonValue]
+from risi.models import (
+    MemoryRecord,
+    PolicyConfiguration,
+    RetrievalQuery,
+    RetrievalResult,
+    StateSnapshot,
+    TraceEvent,
+)
 
 
 class MemoryAdapter(ABC):
-    """Define the complete experimental boundary for a memory backend."""
+    """Define the complete experimental boundary for a memory backend.
+
+    Target operations use ordinary ingest, retrieve, and context methods. Snapshot, reset, trace,
+    and inspection methods belong only to the evaluator harness and must never be surfaced through
+    an attacker or target tool interface.
+    """
 
     @abstractmethod
     def ingest(self, memory: MemoryRecord) -> MemoryRecord:
@@ -45,20 +54,20 @@ class MemoryAdapter(ABC):
         """
 
     @abstractmethod
-    def configure_policy(self, configuration: StateSnapshot) -> None:
-        """Configure replaceable memory-control policies.
+    def configure_policy(self, configuration: PolicyConfiguration) -> None:
+        """Configure a replaceable deterministic memory-control policy.
 
         Args:
-            configuration: Validated policy configuration.
+            configuration: Typed policy identity and target-visible settings.
         """
 
     @abstractmethod
     def snapshot(self) -> StateSnapshot:
-        """Capture complete content, metadata, indexes, queues, and logical time."""
+        """Capture complete target state for evaluator-controlled reset and replay."""
 
     @abstractmethod
     def reset(self, snapshot: StateSnapshot) -> None:
-        """Restore the complete experimental state.
+        """Restore complete deterministic target state.
 
         Args:
             snapshot: Full-state snapshot previously produced by the adapter.
@@ -89,8 +98,8 @@ class MemoryAdapter(ABC):
 
     @abstractmethod
     def export_trace(self) -> tuple[TraceEvent, ...]:
-        """Export the ordered tamper-evident event trace."""
+        """Export the ordered tamper-evident event trace for evaluator verification."""
 
     @abstractmethod
     def inspect_state(self) -> StateSnapshot:
-        """Return evaluator-only state that is never exposed to attacker views."""
+        """Return evaluator-only target state that is never exposed to attacker views."""

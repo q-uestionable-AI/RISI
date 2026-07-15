@@ -1,0 +1,20 @@
+{
+  "snapshot_version": 1,
+  "episode": {
+    "scenario_id": "DEP-01",
+    "episode_id": "episode-dep-01-control",
+    "seed": 17
+  },
+  "logical_time": -1,
+  "next_event_sequence": 0,
+  "source_memories": [],
+  "derived_state": {},
+  "indexes": {},
+  "queues": {},
+  "policy": {
+    "name": "pure_read",
+    "version": "1",
+    "settings": {}
+  },
+  "policy_state": {}
+}
