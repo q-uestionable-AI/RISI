@@ -1,0 +1,46 @@
+{
+  "snapshot_version": 1,
+  "episode": {
+    "scenario_id": "DEP-01",
+    "episode_id": "episode-dep-01-control",
+    "seed": 17
+  },
+  "logical_time": 410,
+  "next_event_sequence": 0,
+  "source_memories": [
+    {
+      "memory_id": "DEP-PROD-07",
+      "scenario_id": "DEP-01",
+      "tenant_id": "northstar-forge",
+      "owner_id": "policy-office",
+      "source_id": "policy-source-07",
+      "content": "Production deployment requires two distinct current approvals.",
+      "access_policy": ["release-coordinator"],
+      "logical_created_at": 300,
+      "logical_valid_from": 300,
+      "logical_valid_until": null,
+      "system_criticality": null,
+      "state": "current",
+      "metadata": {
+        "effective_at": 300
+      }
+    }
+  ],
+  "derived_state": {
+    "read_counts": {}
+  },
+  "indexes": {
+    "by_policy": ["DEP-PROD-07"]
+  },
+  "queues": {
+    "maintenance": []
+  },
+  "policy": {
+    "name": "pure_read",
+    "version": "1",
+    "settings": {
+      "top_k": 5
+    }
+  },
+  "policy_state": {}
+}

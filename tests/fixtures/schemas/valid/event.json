@@ -1,0 +1,16 @@
+{
+  "event_id": "event-dep-01-0000",
+  "episode_id": "episode-dep-01-control",
+  "sequence": 0,
+  "logical_time": 410,
+  "event_type": "episode_started",
+  "actor_principal_id": null,
+  "visibility": "evaluator",
+  "state_hash_before": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "state_hash_after": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "previous_event_hash": null,
+  "event_hash": "df16097869192667faf59ea84225a92cd9a44d8149ba5bd7a9b6a00910638507",
+  "payload": {
+    "scenario_id": "DEP-01"
+  }
+}

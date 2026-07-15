@@ -1,11 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/q-uestionable-AI/RISI/schemas/scenario.schema.json",
-  "title": "RISI scenario",
-  "description": "Synthetic paired-episode scenario contract for RISI and CRAF research.",
+  "title": "RISI synthetic scenario",
+  "description": "Strict paired-episode scenario contract for RISI-C and core CRAF research.",
   "type": "object",
   "additionalProperties": false,
   "required": [
+    "schema_version",
     "scenario_id",
     "domain",
     "phenomenon",
@@ -17,10 +18,13 @@
     "seeds"
   ],
   "properties": {
+    "schema_version": { "const": 1 },
     "scenario_id": { "type": "string", "minLength": 1 },
-    "domain": { "type": "string", "minLength": 1 },
+    "domain": {
+      "enum": ["software_deployment", "data_privacy", "synthetic_medication", "approval", "access"]
+    },
     "phenomenon": { "enum": ["risi", "craf", "combined"] },
-    "world_state": { "type": "object" },
+    "world_state": { "$ref": "#/$defs/worldState" },
     "principals": {
       "type": "array",
       "minItems": 1,
@@ -28,14 +32,18 @@
     },
     "initial_memories": {
       "type": "array",
+      "minItems": 1,
       "items": { "$ref": "#/$defs/memory" }
     },
     "evaluator_only": { "$ref": "#/$defs/evaluatorOnly" },
-    "baseline_history": { "type": "array", "items": { "type": "object" } },
+    "baseline_history": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/baselineEpisode" }
+    },
     "attacker_model": { "$ref": "#/$defs/attackerModel" },
     "risi": { "$ref": "#/$defs/risiCondition" },
     "craf": { "$ref": "#/$defs/crafCondition" },
-    "nuisance_factors": { "type": "object" },
+    "nuisance_factors": { "$ref": "#/$defs/jsonObject" },
     "seeds": {
       "type": "array",
       "minItems": 1,
@@ -58,14 +66,33 @@
     }
   ],
   "$defs": {
+    "worldState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["logical_time", "facts", "policies"],
+      "properties": {
+        "logical_time": { "type": "integer", "minimum": 0 },
+        "facts": { "$ref": "#/$defs/jsonObject" },
+        "policies": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        }
+      }
+    },
     "principal": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["principal_id", "role", "tenant_id"],
+      "required": ["principal_id", "role", "tenant_id", "authorities"],
       "properties": {
         "principal_id": { "type": "string", "minLength": 1 },
         "role": { "enum": ["trusted", "victim", "attacker", "decision"] },
-        "tenant_id": { "type": "string", "minLength": 1 }
+        "tenant_id": { "type": "string", "minLength": 1 },
+        "authorities": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        }
       }
     },
     "memory": {
@@ -74,95 +101,205 @@
       "required": [
         "memory_id",
         "content",
-        "owner",
-        "source",
-        "provenance",
+        "tenant_id",
+        "owner_id",
+        "source_id",
         "access_policy",
-        "validity_interval"
+        "logical_created_at",
+        "logical_valid_from",
+        "logical_valid_until",
+        "state",
+        "metadata"
       ],
       "properties": {
         "memory_id": { "type": "string", "minLength": 1 },
         "content": { "type": "string", "minLength": 1 },
-        "owner": { "type": "string", "minLength": 1 },
-        "source": { "type": "string", "minLength": 1 },
-        "provenance": { "type": "object" },
-        "access_policy": { "type": "array", "items": { "type": "string" } },
-        "system_criticality": { "type": ["string", "null"] },
-        "validity_interval": { "type": "object" },
-        "semantic_variants": { "type": "array", "items": { "type": "string" } }
+        "tenant_id": { "type": "string", "minLength": 1 },
+        "owner_id": { "type": "string", "minLength": 1 },
+        "source_id": { "type": "string", "minLength": 1 },
+        "access_policy": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "logical_created_at": { "type": "integer", "minimum": 0 },
+        "logical_valid_from": { "type": "integer", "minimum": 0 },
+        "logical_valid_until": { "type": ["integer", "null"], "minimum": 0 },
+        "state": { "enum": ["current", "superseded", "hidden", "archived", "deleted"] },
+        "metadata": { "$ref": "#/$defs/jsonObject" }
       }
     },
     "evaluatorOnly": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["memory_oracles"],
+      "required": ["world_state_hash", "memory_oracles", "decision_oracle"],
       "properties": {
+        "world_state_hash": { "$ref": "#/$defs/hash" },
         "memory_oracles": {
           "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["memory_id", "oracle_criticality", "oracle_applicability"],
-            "properties": {
-              "memory_id": { "type": "string" },
-              "oracle_criticality": { "type": "boolean" },
-              "oracle_applicability": { "type": "object" }
-            }
-          }
+          "items": { "$ref": "#/$defs/memoryOracle" }
+        },
+        "decision_oracle": { "$ref": "#/$defs/decisionOracle" }
+      }
+    },
+    "memoryOracle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "memory_id",
+        "oracle_truth",
+        "oracle_criticality",
+        "applicability"
+      ],
+      "properties": {
+        "memory_id": { "type": "string", "minLength": 1 },
+        "oracle_truth": { "type": "boolean" },
+        "oracle_criticality": { "type": "boolean" },
+        "applicability": { "$ref": "#/$defs/jsonObject" }
+      }
+    },
+    "decisionOracle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["oracle_id", "safe_actions"],
+      "properties": {
+        "oracle_id": { "type": "string", "minLength": 1 },
+        "safe_actions": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
         }
+      }
+    },
+    "baselineEpisode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["episode_id", "policy", "safe_decision"],
+      "properties": {
+        "episode_id": { "type": "string", "minLength": 1 },
+        "policy": { "type": "string", "minLength": 1 },
+        "safe_decision": { "type": "boolean" }
       }
     },
     "attackerModel": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["allowed_operations", "budget", "truth_constraints"],
+      "required": ["principal_id", "legitimate_purpose", "allowed_operations", "budget", "truth_constraints"],
       "properties": {
-        "allowed_operations": { "type": "array", "items": { "type": "string" } },
-        "budget": {
+        "principal_id": { "type": "string", "minLength": 1 },
+        "legitimate_purpose": { "type": "string", "minLength": 1 },
+        "allowed_operations": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "budget": { "$ref": "#/$defs/budget" },
+        "truth_constraints": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "interactions",
-            "input_tokens",
-            "admitted_memories",
-            "elapsed_logical_time"
-          ],
+          "required": ["world_entailed_only", "instructions_prohibited", "contradictions_prohibited"],
           "properties": {
-            "interactions": { "type": "integer", "minimum": 0 },
-            "input_tokens": { "type": "integer", "minimum": 0 },
-            "admitted_memories": { "type": "integer", "minimum": 0 },
-            "elapsed_logical_time": { "type": "integer", "minimum": 0 }
+            "world_entailed_only": { "const": true },
+            "instructions_prohibited": { "const": true },
+            "contradictions_prohibited": { "const": true }
           }
-        },
-        "truth_constraints": { "type": "object" }
+        }
+      }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["interactions", "retrieval_calls", "input_tokens", "admitted_memories", "elapsed_logical_time"],
+      "properties": {
+        "interactions": { "type": "integer", "minimum": 0 },
+        "retrieval_calls": { "type": "integer", "minimum": 0 },
+        "input_tokens": { "type": "integer", "minimum": 0 },
+        "admitted_memories": { "type": "integer", "minimum": 0 },
+        "elapsed_logical_time": { "type": "integer", "minimum": 0 }
       }
     },
     "risiCondition": {
       "type": "object",
-      "required": [
-        "candidate_topics",
-        "initialized_candidate_memories",
-        "victim_event",
-        "attacker_observation_schema"
-      ],
+      "additionalProperties": false,
+      "required": ["candidate_memory_ids", "hidden_retrieval", "observer"],
       "properties": {
-        "candidate_topics": { "type": "array", "items": { "type": "string" } },
-        "initialized_candidate_memories": {
+        "candidate_memory_ids": {
           "type": "array",
-          "items": { "type": "string" }
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
         },
-        "victim_event": { "type": "object" },
-        "attacker_observation_schema": { "type": "object" }
+        "hidden_retrieval": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["memory_id", "logical_time"],
+          "properties": {
+            "memory_id": { "type": "string", "minLength": 1 },
+            "logical_time": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "observer": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["principal_id", "allowed_observation_fields", "query_budget"],
+          "properties": {
+            "principal_id": { "type": "string", "minLength": 1 },
+            "allowed_observation_fields": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "uniqueItems": true
+            },
+            "query_budget": { "type": "integer", "minimum": 0 }
+          }
+        }
       }
     },
     "crafCondition": {
       "type": "object",
-      "required": ["protected_memory_ids", "suppressor_candidates", "final_decision"],
+      "additionalProperties": false,
+      "required": [
+        "critical_memory_id",
+        "close_distractor_ids",
+        "unrelated_distractor_ids",
+        "obsolete_memory_id",
+        "required_safe_action"
+      ],
       "properties": {
-        "protected_memory_ids": { "type": "array", "items": { "type": "string" } },
-        "suppressor_candidates": { "type": "array", "items": { "type": "object" } },
-        "final_decision": { "type": "object" }
+        "critical_memory_id": { "type": "string", "minLength": 1 },
+        "close_distractor_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "unrelated_distractor_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "obsolete_memory_id": { "type": "string", "minLength": 1 },
+        "required_safe_action": { "type": "string", "minLength": 1 }
       }
+    },
+    "hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "jsonObject": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/jsonValue" }
+    },
+    "jsonValue": {
+      "oneOf": [
+        { "type": ["string", "number", "integer", "boolean", "null"] },
+        { "type": "array", "items": { "$ref": "#/$defs/jsonValue" } },
+        {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/jsonValue" }
+        }
+      ]
     }
   }
 }
