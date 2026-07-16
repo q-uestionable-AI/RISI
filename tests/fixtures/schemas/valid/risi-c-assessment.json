@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "scenario_id": "DEP-02",
+  "shared_initial_state_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "result": "controlled_mechanism_recovered",
+  "pairs": [
+    {
+      "pair": "vulnerable",
+      "classification": "risi_c",
+      "accuracy": 1.0,
+      "advantage": 0.5,
+      "canary_absent": true,
+      "observer_budget_respected": true,
+      "sole_mediator": true,
+      "state_differences": [
+        {
+          "path": "/derived_state/shared_access_counter",
+          "no_hidden_present": true,
+          "no_hidden_value": 0,
+          "hidden_present": true,
+          "hidden_value": 1
+        }
+      ],
+      "arms": [
+        {
+          "arm": "sham",
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "observer_view_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "final_state_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        {
+          "arm": "hidden",
+          "label": 1,
+          "prediction": 1,
+          "correct": true,
+          "observer_view_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "final_state_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+      ]
+    },
+    {
+      "pair": "pure_read",
+      "classification": "no_failure",
+      "accuracy": 0.5,
+      "advantage": 0.0,
+      "canary_absent": true,
+      "observer_budget_respected": true,
+      "sole_mediator": true,
+      "state_differences": [],
+      "arms": [
+        {
+          "arm": "sham",
+          "label": 0,
+          "prediction": 0,
+          "correct": true,
+          "observer_view_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "final_state_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        },
+        {
+          "arm": "hidden",
+          "label": 1,
+          "prediction": 0,
+          "correct": false,
+          "observer_view_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "final_state_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        }
+      ]
+    }
+  ]
+}

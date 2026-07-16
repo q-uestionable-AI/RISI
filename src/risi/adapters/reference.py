@@ -24,7 +24,9 @@ from risi.models import (
 from risi.trace import create_event, state_snapshot_hash
 
 _TOKEN = re.compile(r"[a-z0-9]+")
-_SUPPORTED_POLICIES = frozenset({"pure-read", "memory-eclipsing", "protected-critical-recall"})
+_SUPPORTED_POLICIES = frozenset(
+    {"pure-read", "memory-eclipsing", "protected-critical-recall", "risi-shared-counter"}
+)
 _PROTECTED_CRITICALITY = "protected-recall"
 
 
@@ -76,6 +78,7 @@ class ReferenceMemoryAdapter(MemoryAdapter):
             if score > 0:
                 scored.append((score, memory.memory_id))
         scored.sort(key=lambda item: (-item[0], item[1]))
+        scored = self._apply_risi_probe_ranking(query, scored)
         suppressed = self._suppressed_memory_ids()
         protected = frozenset(
             memory_id
@@ -310,6 +313,9 @@ class ReferenceMemoryAdapter(MemoryAdapter):
         if name == "pure-read":
             self._validate_pure_read_policy(configuration)
             return
+        if name == "risi-shared-counter":
+            self._validate_risi_policy(configuration)
+            return
         self._validate_adaptive_policy(configuration)
 
     @staticmethod
@@ -351,6 +357,43 @@ class ReferenceMemoryAdapter(MemoryAdapter):
         ):
             raise ValueError("protected reference policy criticality label is invalid")
 
+    def _validate_risi_policy(self, configuration: PolicyConfiguration) -> None:
+        required = {
+            "top_k",
+            "read_side_updates",
+            "canary_memory_id",
+            "victim_principal_id",
+            "observer_principal_id",
+            "no_hidden_signal_memory_id",
+            "hidden_signal_memory_id",
+        }
+        if set(configuration.settings) != required:
+            raise ValueError("RISI reference policy settings are invalid")
+        self._validate_policy_top_k(configuration)
+        if configuration.settings["read_side_updates"] is not True:
+            raise ValueError("RISI reference policy read-side setting is invalid")
+        memory_fields = (
+            "canary_memory_id",
+            "no_hidden_signal_memory_id",
+            "hidden_signal_memory_id",
+        )
+        memory_ids: list[str] = []
+        for field_name in memory_fields:
+            value = configuration.settings[field_name]
+            if not isinstance(value, str) or value not in self._memory_by_id:
+                raise ValueError(f"RISI reference policy {field_name} is invalid")
+            memory_ids.append(value)
+        if len(set(memory_ids)) != len(memory_ids):
+            raise ValueError("RISI reference policy memory identifiers must be distinct")
+        principals: list[str] = []
+        for field_name in ("victim_principal_id", "observer_principal_id"):
+            value = configuration.settings[field_name]
+            if not isinstance(value, str) or not value:
+                raise ValueError(f"RISI reference policy {field_name} is invalid")
+            principals.append(value)
+        if principals[0] == principals[1]:
+            raise ValueError("RISI reference victim and observer principals must differ")
+
     def _suppressed_memory_ids(self) -> frozenset[str]:
         raw = self._state.derived_state.get("suppressed_memory_ids", [])
         if not isinstance(raw, (list, tuple)):
@@ -369,6 +412,9 @@ class ReferenceMemoryAdapter(MemoryAdapter):
     ) -> None:
         policy = self._state.policy
         if policy.identity.name == "pure-read" or not policy.settings.get("read_side_updates"):
+            return
+        if policy.identity.name == "risi-shared-counter":
+            self._apply_risi_counter_update(query, retrieved_memory_ids)
             return
         trigger = policy.settings.get("trigger_memory_id")
         suppressed = policy.settings.get("suppressed_memory_id")
@@ -405,6 +451,70 @@ class ReferenceMemoryAdapter(MemoryAdapter):
             },
             query.principal_id,
         )
+
+    def _apply_risi_counter_update(
+        self,
+        query: RetrievalQuery,
+        retrieved_memory_ids: tuple[str, ...],
+    ) -> None:
+        policy = self._state.policy
+        victim = policy.settings.get("victim_principal_id")
+        canary = policy.settings.get("canary_memory_id")
+        if not isinstance(victim, str) or not isinstance(canary, str):
+            raise TypeError("RISI reference policy identifiers are invalid")
+        if query.principal_id != victim:
+            return
+        prior = self._state.derived_state.get("shared_access_counter", 0)
+        if isinstance(prior, bool) or not isinstance(prior, int) or prior < 0:
+            raise TypeError("derived_state.shared_access_counter is invalid")
+        hidden = canary in retrieved_memory_ids
+        counter = prior + 1 if hidden else prior
+        before = self._state
+        after = replace(
+            before,
+            derived_state={"shared_access_counter": counter},
+            next_event_sequence=before.next_event_sequence + 1,
+        )
+        self._commit_event(
+            before,
+            after,
+            EventType.READ_SIDE_UPDATE,
+            EventVisibility.EVALUATOR,
+            {
+                "operation": "set_shared_access_counter",
+                "counter": counter,
+                "matched_event": "hidden" if hidden else "sham",
+            },
+            query.principal_id,
+        )
+
+    def _apply_risi_probe_ranking(
+        self,
+        query: RetrievalQuery,
+        scored: list[tuple[float, str]],
+    ) -> list[tuple[float, str]]:
+        policy = self._state.policy
+        if policy.identity.name != "risi-shared-counter":
+            return scored
+        observer = policy.settings.get("observer_principal_id")
+        no_hidden = policy.settings.get("no_hidden_signal_memory_id")
+        hidden = policy.settings.get("hidden_signal_memory_id")
+        if (
+            not isinstance(observer, str)
+            or not isinstance(no_hidden, str)
+            or not isinstance(hidden, str)
+        ):
+            raise TypeError("RISI reference observer configuration is invalid")
+        if query.principal_id != observer:
+            return scored
+        candidate_ids = {memory_id for _, memory_id in scored}
+        if not {no_hidden, hidden} <= candidate_ids:
+            return scored
+        counter = self._state.derived_state.get("shared_access_counter", 0)
+        if isinstance(counter, bool) or not isinstance(counter, int) or counter < 0:
+            raise TypeError("derived_state.shared_access_counter is invalid")
+        preferred = hidden if counter > 0 else no_hidden
+        return sorted(scored, key=lambda item: (item[1] != preferred, -item[0], item[1]))
 
     @staticmethod
     def _score(query: str, content: str) -> float:

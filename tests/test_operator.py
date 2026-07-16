@@ -6,6 +6,7 @@ import pytest
 from risi.operator.models import ApprovalRecord, Capability, ExecutionLimits, RunManifest
 from risi.operator.safety import (
     LOCAL_REFERENCE_POLICY,
+    RISI_C_REFERENCE_POLICY,
     PathBoundaryError,
     authorize_run,
     resolve_existing_path,
@@ -39,6 +40,18 @@ def _craf_approval() -> ApprovalRecord:
     return load_approval_record(EXAMPLES / "dep-01-craf-reference.approval.json")
 
 
+def _risi_c_manifest() -> RunManifest:
+    from risi.operator.models import load_run_manifest
+
+    return load_run_manifest(EXAMPLES / "dep-02-risi-c-reference.manifest.json")
+
+
+def _risi_c_approval() -> ApprovalRecord:
+    from risi.operator.models import load_approval_record
+
+    return load_approval_record(EXAMPLES / "dep-02-risi-c-reference.approval.json")
+
+
 def test_example_approval_is_bound_to_canonical_manifest() -> None:
     manifest = _manifest()
     approval = _approval()
@@ -63,6 +76,22 @@ def test_craf_example_uses_a_separate_closed_policy_and_exact_limits() -> None:
     denied = authorize_run(changed, changed_approval)
     assert not denied.allowed
     assert "memory_policy_denied" in denied.reason_codes
+
+
+def test_risi_c_example_uses_a_separate_closed_policy_and_exact_limits() -> None:
+    manifest = _risi_c_manifest()
+    approval = _risi_c_approval()
+
+    decision = authorize_run(manifest, approval)
+
+    assert decision.allowed
+    assert manifest.policy == "risi-c-reference"
+    assert manifest.decision_provider == "deterministic-region"
+    assert manifest.limits.episodes == 4
+    assert manifest.limits.retrieval_calls == 12
+    profile = RISI_C_REFERENCE_POLICY.to_json()
+    assert profile["network"] == "denied"
+    assert profile["credentials"] == "denied"
 
 
 def test_manifest_cannot_self_grant_or_exceed_profile_limits() -> None:

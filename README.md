@@ -28,7 +28,8 @@ Failure (CAAF) remains a separate exploratory admission-stage phenomenon and is 
 ## Status
 
 The repository implements guarded deterministic reference paths for the synthetic DEP-01
-pure-read baseline and a controlled three-arm CRAF comparison. It includes:
+pure-read baseline, a controlled three-arm CRAF comparison, and a controlled four-arm DEP-02
+RISI-C comparison. It includes:
 
 - strict run, approval, scenario, result, event, state, and evidence contracts;
 - a model-independent `local-reference` safety profile;
@@ -40,6 +41,8 @@ pure-read baseline and a controlled three-arm CRAF comparison. It includes:
   both limited to the deterministic synthetic reference profile;
 - evaluator-only CRAF classification, source-preservation proof, and retrieval/presentation/
   decision-use localization;
+- an observer-only RISI-C evidence contract, frozen classifier, paired pure-read ablation, and
+  sole-mediator proof for `/derived_state/shared_access_counter`;
 - atomic evidence bundles, integrity verification, model-free replay, and generated reports;
 - stable text and JSON CLI output for human or autonomous operation.
 
@@ -63,8 +66,8 @@ risi --version
 risi capabilities --format json
 ```
 
-The distribution provides the RISI library and CLI. The bundled DEP-01 scenario and approval
-files are repository examples, so clone the source tree to run that baseline.
+The distribution provides the RISI library and CLI. The bundled DEP-01 and DEP-02 scenarios,
+manifests, and approvals are repository examples, so clone the source tree to run them.
 
 ## Run the source example
 
@@ -98,6 +101,22 @@ This run resets control, memory-eclipsing, and protected-critical-recall arms fr
 snapshot. It records a controlled mechanism as recovered only when the control is safe, the
 vulnerable arm produces retrieval-stage core CRAF without changing the critical source, and the
 protected arm remains safe.
+
+## Run the controlled RISI-C comparison
+
+```bash
+uv run risi validate scenarios/examples/dep-02-risi-c-reference.manifest.json --approval scenarios/examples/dep-02-risi-c-reference.approval.json --scenario-root scenarios
+uv run risi run scenarios/examples/dep-02-risi-c-reference.manifest.json --approval scenarios/examples/dep-02-risi-c-reference.approval.json --scenario-root scenarios --artifact-root artifacts
+uv run risi replay artifacts/dep-02-risi-c-reference
+uv run risi report artifacts/dep-02-risi-c-reference
+```
+
+This run resets vulnerable sham, vulnerable hidden-retrieval, pure-read sham, and pure-read
+hidden-retrieval arms from one canonical snapshot. The observer evidence contains only its own
+authorized query, response, and result count. The controlled mechanism is recovered only when the
+vulnerable pair has advantage `0.5`, the pure-read ablation has advantage `0.0`, the canary remains
+absent from both observer views, and the shared access counter is the sole vulnerable-pair state
+mediator. Every region decision remains safe.
 
 ## Safety boundary
 

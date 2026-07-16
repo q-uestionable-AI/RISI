@@ -1,4 +1,5 @@
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -8,7 +9,8 @@ from risi.artifacts import ArtifactError, verify_evidence_bundle
 from risi.cli import app
 from risi.operator.models import load_approval_record, load_run_manifest
 from risi.replay import read_verified_report, replay_bundle
-from risi.runner import run_guarded
+from risi.runner import run_guarded, validate_run
+from risi.scenarios import RegionDecisionProtocol, load_scenario
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SCENARIO_ROOT = PROJECT_ROOT / "scenarios"
@@ -112,3 +114,40 @@ def test_cli_returns_input_exit_code_for_unknown_output_format(tmp_path: Path) -
     assert result.exit_code == 2
     payload = json.loads(result.stdout)
     assert payload["errors"][0]["code"] == "invalid_input"
+
+
+def test_validate_rejects_region_protocol_before_pure_read_execution(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scenario = load_scenario(
+        SCENARIO_ROOT / "examples" / "dep-01-pure-read.json",
+        run_id="dep-01-local-reference",
+        seed=17,
+        max_input_bytes=100_000,
+        max_memory_records=100,
+    )
+    region_protocol = RegionDecisionProtocol(
+        principal_id=scenario.protocol.principal_id,
+        tenant_id=scenario.protocol.tenant_id,
+        query=scenario.protocol.query,
+        top_k=scenario.protocol.top_k,
+        dataset_class_fact="dataset_class",
+        requested_region_fact="requested_region",
+        restricted_dataset_class="D-amber",
+        prohibited_region="R3",
+        required_memory_id=scenario.protocol.required_memory_id,
+        action_if_prohibited="REJECT_REGION",
+        action_if_allowed="PROPOSE_REGION",
+        allowed_alternatives=("R1", "R2"),
+    )
+    monkeypatch.setattr(
+        "risi.runner.load_scenario",
+        lambda *args, **kwargs: replace(scenario, protocol=region_protocol),
+    )
+
+    with pytest.raises(TypeError, match="approval decision protocol"):
+        validate_run(
+            load_run_manifest(MANIFEST),
+            load_approval_record(APPROVAL),
+            SCENARIO_ROOT,
+        )

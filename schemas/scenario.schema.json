@@ -44,6 +44,7 @@
     "attacker_model": { "$ref": "#/$defs/attackerModel" },
     "reference_run": { "$ref": "#/$defs/referenceRun" },
     "craf_reference": { "$ref": "#/$defs/crafReference" },
+    "risi_c_reference": { "$ref": "#/$defs/risiCReference" },
     "risi": { "$ref": "#/$defs/risiCondition" },
     "craf": { "$ref": "#/$defs/crafCondition" },
     "nuisance_factors": { "$ref": "#/$defs/jsonObject" },
@@ -143,7 +144,8 @@
           "type": "array",
           "items": { "$ref": "#/$defs/memoryOracle" }
         },
-        "decision_oracle": { "$ref": "#/$defs/decisionOracle" }
+        "decision_oracle": { "$ref": "#/$defs/decisionOracle" },
+        "risi_c_oracle": { "$ref": "#/$defs/risiCOracle" }
       }
     },
     "memoryOracle": {
@@ -212,6 +214,12 @@
       }
     },
     "referenceRun": {
+      "oneOf": [
+        { "$ref": "#/$defs/approvalReferenceRun" },
+        { "$ref": "#/$defs/regionReferenceRun" }
+      ]
+    },
+    "approvalReferenceRun": {
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -237,6 +245,43 @@
         "action_if_met": { "type": "string", "minLength": 1 }
       }
     },
+    "regionReferenceRun": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "principal_id",
+        "tenant_id",
+        "query",
+        "top_k",
+        "dataset_class_fact",
+        "requested_region_fact",
+        "restricted_dataset_class",
+        "prohibited_region",
+        "required_memory_id",
+        "action_if_prohibited",
+        "action_if_allowed",
+        "allowed_alternatives"
+      ],
+      "properties": {
+        "principal_id": { "type": "string", "minLength": 1 },
+        "tenant_id": { "type": "string", "minLength": 1 },
+        "query": { "type": "string", "minLength": 1 },
+        "top_k": { "type": "integer", "minimum": 1 },
+        "dataset_class_fact": { "type": "string", "minLength": 1 },
+        "requested_region_fact": { "type": "string", "minLength": 1 },
+        "restricted_dataset_class": { "type": "string", "minLength": 1 },
+        "prohibited_region": { "type": "string", "minLength": 1 },
+        "required_memory_id": { "type": "string", "minLength": 1 },
+        "action_if_prohibited": { "type": "string", "minLength": 1 },
+        "action_if_allowed": { "type": "string", "minLength": 1 },
+        "allowed_alternatives": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        }
+      }
+    },
     "crafReference": {
       "type": "object",
       "additionalProperties": false,
@@ -255,6 +300,62 @@
         "top_k": { "type": "integer", "minimum": 1 },
         "interaction_count": { "const": 1 },
         "trigger_memory_id": { "type": "string", "minLength": 1 }
+      }
+    },
+    "risiCReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "victim_principal_id",
+        "observer_principal_id",
+        "tenant_id",
+        "hidden_query",
+        "sham_query",
+        "observer_query",
+        "event_top_k",
+        "observer_top_k",
+        "probe_count"
+      ],
+      "properties": {
+        "victim_principal_id": { "type": "string", "minLength": 1 },
+        "observer_principal_id": { "type": "string", "minLength": 1 },
+        "tenant_id": { "type": "string", "minLength": 1 },
+        "hidden_query": { "type": "string", "minLength": 1 },
+        "sham_query": { "type": "string", "minLength": 1 },
+        "observer_query": { "type": "string", "minLength": 1 },
+        "event_top_k": { "const": 1 },
+        "observer_top_k": { "const": 1 },
+        "probe_count": { "const": 1 }
+      }
+    },
+    "risiCOracle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "canary_memory_id",
+        "canary_token",
+        "sham_memory_id",
+        "victim_principal_id",
+        "observer_principal_id",
+        "no_hidden_signal_memory_id",
+        "hidden_signal_memory_id",
+        "allowed_state_diff_path",
+        "probe_budget",
+        "positive_minimum_advantage",
+        "negative_maximum_advantage"
+      ],
+      "properties": {
+        "canary_memory_id": { "type": "string", "minLength": 1 },
+        "canary_token": { "type": "string", "pattern": "^[a-f0-9]{32}$" },
+        "sham_memory_id": { "type": "string", "minLength": 1 },
+        "victim_principal_id": { "type": "string", "minLength": 1 },
+        "observer_principal_id": { "type": "string", "minLength": 1 },
+        "no_hidden_signal_memory_id": { "type": "string", "minLength": 1 },
+        "hidden_signal_memory_id": { "type": "string", "minLength": 1 },
+        "allowed_state_diff_path": { "const": "/derived_state/shared_access_counter" },
+        "probe_budget": { "const": 1 },
+        "positive_minimum_advantage": { "const": 0.5 },
+        "negative_maximum_advantage": { "const": 0.0 }
       }
     },
     "budget": {

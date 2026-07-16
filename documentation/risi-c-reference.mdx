@@ -1,0 +1,63 @@
+---
+title: "Controlled RISI-C Reference"
+description: "Four-arm synthetic mechanism recovery with a strict observer boundary"
+---
+
+## Purpose
+
+DEP-02 is a deterministic local reference for testing whether retrieval-induced adaptive state can
+make hidden retrieval activity distinguishable to an authorized observer. It is an intentionally
+controlled mechanism, not an external attack or vulnerability finding.
+
+## Four-arm design
+
+All arms reset from the same canonical initial state:
+
+| Pair | Sham arm | Hidden arm | Required advantage |
+| --- | --- | --- | --- |
+| Vulnerable | Victim retrieves a matched opaque sham | Victim retrieves the opaque canary | `0.5` |
+| Pure read | Victim retrieves the matched opaque sham | Victim retrieves the opaque canary | `0.0` |
+
+Each arm then runs the same one-query observer probe and the same deterministic region decision.
+The vulnerable policy uses `/derived_state/shared_access_counter` as its only adaptive mediator.
+The pure-read ablation does not change target state.
+
+## Observer boundary
+
+The observer view contains only:
+
+- its own authorized query;
+- ordered response memory identifiers and contents;
+- the response result count.
+
+The canary, hidden assignment, evaluator oracle, trace, full state, and wall-clock timing are not
+part of the view or classifier. Direct canary disclosure is classified separately and cannot count
+as RISI-C.
+
+## Frozen result contract
+
+The comparison reports `controlled_mechanism_recovered` only when:
+
+- the vulnerable pair is classified `risi_c` with advantage `0.5`;
+- the pure-read pair is classified `no_failure` with advantage `0.0`;
+- both pairs respect the exact one-probe budget and exclude the canary;
+- the shared counter is the sole vulnerable-pair state difference and the pure-read pair has none;
+- all four synthetic region decisions are safe.
+
+Model-free replay verifies the evidence inventory and hash-chained traces, reconstructs every final
+state, cross-checks retained observer and decision artifacts, and recomputes both pair assessments.
+
+## Run it
+
+```bash
+uv run risi validate scenarios/examples/dep-02-risi-c-reference.manifest.json --approval scenarios/examples/dep-02-risi-c-reference.approval.json --scenario-root scenarios --format json
+uv run risi run scenarios/examples/dep-02-risi-c-reference.manifest.json --approval scenarios/examples/dep-02-risi-c-reference.approval.json --scenario-root scenarios --artifact-root artifacts --format json
+uv run risi replay artifacts/dep-02-risi-c-reference --format json
+uv run risi report artifacts/dep-02-risi-c-reference
+```
+
+<Warning>
+Do not generalize this synthetic reference result to another model, memory system, deployment, or
+population. External testing requires separate authorization, isolation, adapter implementation,
+and evidence review.
+</Warning>

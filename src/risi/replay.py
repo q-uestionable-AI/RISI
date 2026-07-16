@@ -15,6 +15,16 @@ from risi.artifacts import (
     verify_evidence_bundle,
 )
 from risi.canonical import JsonValue, canonical_sha256, normalize_json_value
+from risi.confidentiality import (
+    ObserverExchange,
+    ObserverView,
+    RisiCArm,
+    RisiCOracle,
+    RisiCPair,
+    RisiCPairAssessment,
+    assess_risi_c_comparison,
+    assess_risi_c_pair,
+)
 from risi.models import (
     EpisodeIdentity,
     EventType,
@@ -23,6 +33,7 @@ from risi.models import (
     MemoryState,
     PolicyConfiguration,
     PolicyIdentity,
+    RetrievalQuery,
     StateSnapshot,
     TraceEvent,
 )
@@ -131,6 +142,65 @@ class CrafReplayResult:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class RisiCArmReplay:
+    """Summarize one reconstructed DEP-02 arm."""
+
+    pair: str
+    arm: str
+    event_count: int
+    final_state_hash: str
+    observer_view_hash: str
+    decision_action: str
+    safe: bool
+
+    def to_json(self) -> dict[str, JsonValue]:
+        """Return the machine-readable arm replay summary."""
+        return {
+            "pair": self.pair,
+            "arm": self.arm,
+            "event_count": self.event_count,
+            "final_state_hash": self.final_state_hash,
+            "observer_view_hash": self.observer_view_hash,
+            "decision_action": self.decision_action,
+            "safe": self.safe,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class _RisiCArmOutputs:
+    """Group retained arm outputs for cross-artifact verification."""
+
+    victim: dict[str, Any]
+    observer_view: ObserverView
+    decision_retrieval: dict[str, Any]
+    decision_context: dict[str, Any]
+    decision: dict[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
+class RisiCReplayResult:
+    """Summarize a successful model-free four-arm RISI-C replay."""
+
+    run_id: str
+    event_count: int
+    initial_state_hash: str
+    comparison_result: str
+    arms: tuple[RisiCArmReplay, ...]
+    verification: BundleVerification
+
+    def to_json(self) -> dict[str, JsonValue]:
+        """Return the machine-readable RISI-C replay summary."""
+        return {
+            "run_id": self.run_id,
+            "event_count": self.event_count,
+            "initial_state_hash": self.initial_state_hash,
+            "comparison_result": self.comparison_result,
+            "arms": [arm.to_json() for arm in self.arms],
+            "verification": self.verification.to_json(),
+        }
+
+
 def _object(value: Any, field_name: str) -> dict[str, Any]:
     if not isinstance(value, Mapping):
         raise ArtifactError(f"{field_name} must be an object")
@@ -141,6 +211,12 @@ def _array(value: Any, field_name: str) -> list[Any]:
     if not isinstance(value, list):
         raise ArtifactError(f"{field_name} must be an array")
     return cast(list[Any], value)
+
+
+def _sequence(value: Any, field_name: str) -> tuple[Any, ...]:
+    if not isinstance(value, (list, tuple)):
+        raise ArtifactError(f"{field_name} must be an array")
+    return tuple(value)
 
 
 def _string(value: Any, field_name: str) -> str:
@@ -159,6 +235,12 @@ def _boolean(value: Any, field_name: str) -> bool:
     if not isinstance(value, bool):
         raise ArtifactError(f"{field_name} must be a boolean")
     return value
+
+
+def _number(value: Any, field_name: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ArtifactError(f"{field_name} must be a number")
+    return float(value)
 
 
 def _state_from_json(value: dict[str, Any]) -> StateSnapshot:
@@ -269,6 +351,94 @@ def _policy_from_json(value: Any, field_name: str) -> PolicyConfiguration:
     )
 
 
+def _query_from_json(value: Any, field_name: str) -> RetrievalQuery:
+    query = _object(value, field_name)
+    if set(query) != {"principal_id", "tenant_id", "text", "top_k"}:
+        raise ArtifactError(f"{field_name} has an invalid field set")
+    return RetrievalQuery(
+        principal_id=_string(query.get("principal_id"), f"{field_name}.principal_id"),
+        tenant_id=_string(query.get("tenant_id"), f"{field_name}.tenant_id"),
+        text=_string(query.get("text"), f"{field_name}.text"),
+        top_k=_integer(query.get("top_k"), f"{field_name}.top_k"),
+    )
+
+
+def _observer_view_from_json(value: Any) -> ObserverView:
+    raw = _object(value, "observer view")
+    if set(raw) != {"principal_id", "exchanges"}:
+        raise ArtifactError("observer view has an invalid field set")
+    exchanges: list[ObserverExchange] = []
+    for item in _array(raw.get("exchanges"), "observer view exchanges"):
+        exchange = _object(item, "observer exchange")
+        expected = {
+            "query_index",
+            "query",
+            "response_memory_ids",
+            "response_contents",
+            "metadata",
+        }
+        if set(exchange) != expected:
+            raise ArtifactError("observer exchange has an invalid field set")
+        exchanges.append(
+            ObserverExchange(
+                query_index=_integer(exchange.get("query_index"), "observer query_index"),
+                query=_query_from_json(exchange.get("query"), "observer query"),
+                response_memory_ids=tuple(
+                    _string(entry, "observer response memory ID")
+                    for entry in _array(
+                        exchange.get("response_memory_ids"), "observer response memory IDs"
+                    )
+                ),
+                response_contents=tuple(
+                    _string(entry, "observer response content")
+                    for entry in _array(
+                        exchange.get("response_contents"), "observer response contents"
+                    )
+                ),
+                metadata=_object(exchange.get("metadata"), "observer metadata"),
+            )
+        )
+    try:
+        return ObserverView(
+            principal_id=_string(raw.get("principal_id"), "observer principal_id"),
+            exchanges=tuple(exchanges),
+        )
+    except (TypeError, ValueError) as exc:
+        raise ArtifactError(f"invalid observer view: {exc}") from exc
+
+
+def _risi_c_oracle_from_json(value: Any) -> RisiCOracle:
+    raw = _object(value, "risi_c_oracle")
+    try:
+        return RisiCOracle(
+            canary_memory_id=_string(raw.get("canary_memory_id"), "canary_memory_id"),
+            canary_token=_string(raw.get("canary_token"), "canary_token"),
+            sham_memory_id=_string(raw.get("sham_memory_id"), "sham_memory_id"),
+            victim_principal_id=_string(raw.get("victim_principal_id"), "victim_principal_id"),
+            observer_principal_id=_string(
+                raw.get("observer_principal_id"), "observer_principal_id"
+            ),
+            no_hidden_signal_memory_id=_string(
+                raw.get("no_hidden_signal_memory_id"), "no_hidden_signal_memory_id"
+            ),
+            hidden_signal_memory_id=_string(
+                raw.get("hidden_signal_memory_id"), "hidden_signal_memory_id"
+            ),
+            allowed_state_diff_path=_string(
+                raw.get("allowed_state_diff_path"), "allowed_state_diff_path"
+            ),
+            probe_budget=_integer(raw.get("probe_budget"), "probe_budget"),
+            positive_minimum_advantage=_number(
+                raw.get("positive_minimum_advantage"), "positive_minimum_advantage"
+            ),
+            negative_maximum_advantage=_number(
+                raw.get("negative_maximum_advantage"), "negative_maximum_advantage"
+            ),
+        )
+    except ValueError as exc:
+        raise ArtifactError(f"invalid RISI-C oracle: {exc}") from exc
+
+
 def _apply_event(state: StateSnapshot, event: TraceEvent) -> StateSnapshot:
     if event.state_hash_before != state_snapshot_hash(state):
         raise ArtifactError("event does not apply to the reconstructed state")
@@ -280,22 +450,36 @@ def _apply_event(state: StateSnapshot, event: TraceEvent) -> StateSnapshot:
             next_event_sequence=next_sequence,
         )
     elif event.event_type is EventType.READ_SIDE_UPDATE:
-        if event.payload.get("operation") != "set_memory_eclipse":
+        operation = event.payload.get("operation")
+        if operation == "set_shared_access_counter":
+            counter = _integer(event.payload.get("counter"), "counter")
+            matched_event = _string(event.payload.get("matched_event"), "matched_event")
+            if matched_event not in {"hidden", "sham"}:
+                raise ArtifactError("unsupported RISI-C matched event")
+            reconstructed = replace(
+                state,
+                derived_state={"shared_access_counter": counter},
+                next_event_sequence=next_sequence,
+            )
+        elif operation != "set_memory_eclipse":
             raise ArtifactError("unsupported read-side state transition")
-        trigger = _string(event.payload.get("trigger_memory_id"), "trigger_memory_id")
-        suppressed = _string(event.payload.get("suppressed_memory_id"), "suppressed_memory_id")
-        tenant_id = _string(event.payload.get("tenant_id"), "tenant_id")
-        interaction_count = _integer(event.payload.get("interaction_count"), "interaction_count")
-        reconstructed = replace(
-            state,
-            derived_state={
-                "suppressed_memory_ids": [suppressed],
-                "trigger_memory_ids": [trigger],
-                "tenant_id": tenant_id,
-            },
-            policy_state={"interaction_count": interaction_count},
-            next_event_sequence=next_sequence,
-        )
+        else:
+            trigger = _string(event.payload.get("trigger_memory_id"), "trigger_memory_id")
+            suppressed = _string(event.payload.get("suppressed_memory_id"), "suppressed_memory_id")
+            tenant_id = _string(event.payload.get("tenant_id"), "tenant_id")
+            interaction_count = _integer(
+                event.payload.get("interaction_count"), "interaction_count"
+            )
+            reconstructed = replace(
+                state,
+                derived_state={
+                    "suppressed_memory_ids": [suppressed],
+                    "trigger_memory_ids": [trigger],
+                    "tenant_id": tenant_id,
+                },
+                policy_state={"interaction_count": interaction_count},
+                next_event_sequence=next_sequence,
+            )
     else:
         reconstructed = replace(state, next_event_sequence=next_sequence)
     if event.state_hash_after != state_snapshot_hash(reconstructed):
@@ -573,7 +757,237 @@ def _replay_craf_bundle(
     )
 
 
-def replay_bundle(bundle_path: Path) -> ReplayResult | CrafReplayResult:
+def _verify_risi_c_arm_outputs(
+    pair: RisiCPair,
+    arm: RisiCArm,
+    initial: StateSnapshot,
+    events: tuple[TraceEvent, ...],
+    outputs: _RisiCArmOutputs,
+) -> None:
+    label = f"{pair.value}/{arm.value}"
+    retrieval_events = tuple(
+        event for event in events if event.event_type is EventType.RETRIEVAL_COMPLETED
+    )
+    context_events = tuple(
+        event for event in events if event.event_type is EventType.CONTEXT_ASSEMBLED
+    )
+    decision_events = tuple(event for event in events if event.event_type is EventType.DECISION)
+    if len(retrieval_events) != 3 or len(context_events) != 3 or len(decision_events) != 1:
+        raise ArtifactError(f"{label} output event structure is invalid")
+    retained_pairs = (
+        (
+            retrieval_events[0].payload.get("query"),
+            outputs.victim.get("query"),
+            "victim query",
+        ),
+        (
+            retrieval_events[0].payload.get("result"),
+            outputs.victim.get("result"),
+            "victim result",
+        ),
+        (
+            context_events[0].payload.get("context"),
+            outputs.victim.get("context"),
+            "victim context",
+        ),
+        (
+            retrieval_events[2].payload.get("query"),
+            outputs.decision_retrieval.get("query"),
+            "decision query",
+        ),
+        (
+            retrieval_events[2].payload.get("result"),
+            outputs.decision_retrieval.get("result"),
+            "decision result",
+        ),
+        (
+            context_events[2].payload.get("context"),
+            outputs.decision_context.get("context"),
+            "decision context",
+        ),
+        (decision_events[0].payload.get("decision"), outputs.decision, "decision"),
+    )
+    for event_value, artifact_value, field_name in retained_pairs:
+        if normalize_json_value(event_value) != normalize_json_value(artifact_value):
+            raise ArtifactError(f"{label} {field_name} artifact does not match its event")
+    if len(outputs.observer_view.exchanges) != 1:
+        raise ArtifactError(f"{label} observer view does not contain one exchange")
+    exchange = outputs.observer_view.exchanges[0]
+    observer_event = retrieval_events[1]
+    if normalize_json_value(observer_event.payload.get("query")) != normalize_json_value(
+        exchange.query.to_json()
+    ):
+        raise ArtifactError(f"{label} observer query does not match its event")
+    observer_result = _object(observer_event.payload.get("result"), "observer result")
+    event_ids = tuple(
+        _string(_object(item, "observer hit").get("memory_id"), "observer memory_id")
+        for item in _sequence(observer_result.get("hits"), "observer result hits")
+    )
+    if event_ids != exchange.response_memory_ids:
+        raise ArtifactError(f"{label} observer response IDs do not match the event")
+    source_by_id = {memory.memory_id: memory.content for memory in initial.source_memories}
+    try:
+        expected_contents = tuple(source_by_id[memory_id] for memory_id in event_ids)
+    except KeyError as exc:
+        raise ArtifactError(f"{label} observer result references an unknown memory") from exc
+    if expected_contents != exchange.response_contents:
+        raise ArtifactError(f"{label} observer contents do not match source memories")
+
+
+def _replay_risi_c_arm(
+    bundle_path: Path,
+    initial: StateSnapshot,
+    pair: RisiCPair,
+    arm: RisiCArm,
+    safe_actions: frozenset[str],
+) -> tuple[RisiCArmReplay, StateSnapshot, ObserverView]:
+    prefix = f"pairs/{pair.value}/arms/{arm.value}"
+    evaluator_prefix = f"evaluator/{prefix}"
+    events = _load_events(bundle_path, f"{evaluator_prefix}/events.jsonl")
+    try:
+        verify_trace(events)
+    except ValueError as exc:
+        raise ArtifactError(f"{pair.value}/{arm.value} trace verification failed: {exc}") from exc
+    reconstructed = _replay_events(initial, events)
+    expected_final = _state_from_json(
+        load_json_artifact(bundle_path, f"{evaluator_prefix}/final-state.json")
+    )
+    if reconstructed != expected_final:
+        raise ArtifactError(f"{pair.value}/{arm.value} reconstructed state is invalid")
+    if reconstructed.source_memories != initial.source_memories:
+        raise ArtifactError(f"{pair.value}/{arm.value} changed source memories")
+    victim = load_json_artifact(bundle_path, f"{evaluator_prefix}/victim-event.json")
+    observer_view = _observer_view_from_json(
+        load_json_artifact(bundle_path, f"observer/{prefix}/view.json")
+    )
+    decision_retrieval = load_json_artifact(bundle_path, f"target/{prefix}/decision-retrieval.json")
+    decision_context = load_json_artifact(bundle_path, f"target/{prefix}/decision-context.json")
+    decision = load_json_artifact(bundle_path, f"target/{prefix}/decision.json")
+    decision_assessment = load_json_artifact(
+        bundle_path, f"{evaluator_prefix}/decision-assessment.json"
+    )
+    outputs = _RisiCArmOutputs(
+        victim=victim,
+        observer_view=observer_view,
+        decision_retrieval=decision_retrieval,
+        decision_context=decision_context,
+        decision=decision,
+    )
+    _verify_risi_c_arm_outputs(pair, arm, initial, events, outputs)
+    action = _string(decision.get("action"), "decision.action")
+    safe = action in safe_actions
+    if _boolean(decision_assessment.get("safe"), "decision_assessment.safe") != safe:
+        raise ArtifactError(f"{pair.value}/{arm.value} decision assessment is invalid")
+    if not safe:
+        raise ArtifactError(f"{pair.value}/{arm.value} region decision is unsafe")
+    replay = RisiCArmReplay(
+        pair=pair.value,
+        arm=arm.value,
+        event_count=len(events),
+        final_state_hash=state_snapshot_hash(reconstructed),
+        observer_view_hash=canonical_sha256(observer_view.to_json()),
+        decision_action=action,
+        safe=safe,
+    )
+    return replay, reconstructed, observer_view
+
+
+def _expected_risi_execution_pairs(
+    assessments: tuple[RisiCPairAssessment, ...],
+    arms: tuple[RisiCArmReplay, ...],
+) -> list[JsonValue]:
+    expected: list[JsonValue] = []
+    by_assessment = {assessment.pair.value: assessment for assessment in assessments}
+    for pair in RisiCPair:
+        assessment = by_assessment[pair.value]
+        arm_values: list[JsonValue] = [
+            {
+                "arm": replay.arm,
+                "safe": replay.safe,
+                "final_state_hash": replay.final_state_hash,
+                "observer_view_hash": replay.observer_view_hash,
+                "event_count": replay.event_count,
+            }
+            for replay in arms
+            if replay.pair == pair.value
+        ]
+        expected.append(
+            {
+                "pair": pair.value,
+                "classification": assessment.classification.value,
+                "advantage": assessment.advantage,
+                "sole_mediator": assessment.sole_mediator,
+                "arms": arm_values,
+            }
+        )
+    return expected
+
+
+def _replay_risi_c_bundle(
+    bundle_path: Path,
+    verification: BundleVerification,
+    execution: dict[str, Any],
+) -> RisiCReplayResult:
+    initial = _state_from_json(load_json_artifact(bundle_path, "evaluator/initial-state.json"))
+    evaluator = load_json_artifact(bundle_path, "evaluator/evaluator-state.json")
+    oracle = _risi_c_oracle_from_json(evaluator.get("risi_c_oracle"))
+    decision_oracle = _object(evaluator.get("decision_oracle"), "decision_oracle")
+    safe_actions = frozenset(
+        _string(item, "safe_action")
+        for item in _array(decision_oracle.get("safe_actions"), "safe_actions")
+    )
+    replays: list[RisiCArmReplay] = []
+    states: dict[tuple[RisiCPair, RisiCArm], StateSnapshot] = {}
+    views: dict[tuple[RisiCPair, RisiCArm], ObserverView] = {}
+    for pair in RisiCPair:
+        for arm in RisiCArm:
+            replay, state, view = _replay_risi_c_arm(bundle_path, initial, pair, arm, safe_actions)
+            replays.append(replay)
+            states[(pair, arm)] = state
+            views[(pair, arm)] = view
+    assessments: dict[RisiCPair, RisiCPairAssessment] = {}
+    for pair in RisiCPair:
+        assessments[pair] = assess_risi_c_pair(
+            pair,
+            states[(pair, RisiCArm.SHAM)],
+            states[(pair, RisiCArm.HIDDEN)],
+            views[(pair, RisiCArm.SHAM)],
+            views[(pair, RisiCArm.HIDDEN)],
+            oracle,
+        )
+    recomputed = assess_risi_c_comparison(
+        _string(execution.get("scenario_id"), "execution.scenario_id")
+        if "scenario_id" in execution
+        else _string(
+            load_json_artifact(bundle_path, "target-scenario.json").get("scenario_id"),
+            "scenario_id",
+        ),
+        state_snapshot_hash(initial),
+        assessments[RisiCPair.VULNERABLE],
+        assessments[RisiCPair.PURE_READ],
+    )
+    retained = load_json_artifact(bundle_path, "evaluator/risi-c-comparison.json")
+    if normalize_json_value(retained) != normalize_json_value(recomputed.to_json()):
+        raise ArtifactError("RISI-C comparison does not match reconstructed evidence")
+    if execution.get("comparison_result") != recomputed.result.value:
+        raise ArtifactError("execution and RISI-C comparison results disagree")
+    total_events = sum(arm.event_count for arm in replays)
+    if _integer(execution.get("event_count"), "execution.event_count") != total_events:
+        raise ArtifactError("execution event count does not match reconstructed RISI-C arms")
+    expected_pairs = _expected_risi_execution_pairs(tuple(assessments.values()), tuple(replays))
+    if normalize_json_value(execution.get("pairs")) != normalize_json_value(expected_pairs):
+        raise ArtifactError("execution pair summaries do not match reconstructed evidence")
+    return RisiCReplayResult(
+        run_id=_string(execution.get("run_id"), "execution.run_id"),
+        event_count=total_events,
+        initial_state_hash=state_snapshot_hash(initial),
+        comparison_result=recomputed.result.value,
+        arms=tuple(replays),
+        verification=verification,
+    )
+
+
+def replay_bundle(bundle_path: Path) -> ReplayResult | CrafReplayResult | RisiCReplayResult:
     """Verify and replay a deterministic reference bundle without invoking a model.
 
     Args:
@@ -589,6 +1003,8 @@ def replay_bundle(bundle_path: Path) -> ReplayResult | CrafReplayResult:
     execution = load_json_artifact(bundle_path, "execution.json")
     if execution.get("policy") == "craf-reference":
         return _replay_craf_bundle(bundle_path, verification, execution)
+    if execution.get("policy") == "risi-c-reference":
+        return _replay_risi_c_bundle(bundle_path, verification, execution)
     initial = _state_from_json(load_json_artifact(bundle_path, "initial-state.json"))
     expected_final = _state_from_json(load_json_artifact(bundle_path, "final-state.json"))
     events = _load_events(bundle_path)

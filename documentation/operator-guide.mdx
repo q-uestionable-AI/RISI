@@ -37,6 +37,11 @@ bundles contain one final state, retrieval, context, decision, and assessment. C
 bundles contain one shared initial state, per-arm final states and outputs, per-arm evaluator
 assessments, and a comparison assessment.
 
+Controlled RISI-C bundles contain one evaluator-only initial snapshot and comparison, four
+evaluator-only final states and traces, four strict observer views, and retained synthetic decision
+artifacts. Observer views contain only the observer's own query, response identifiers and contents,
+and result count.
+
 `inventory.json` records the path, size, and SHA-256 of every file. Retain the inventory SHA-256
 reported by `risi run` outside the bundle when an independent integrity anchor is needed.
 
@@ -44,6 +49,12 @@ The `craf-reference` manifest requests exactly three episodes and six retrieval 
 `controlled_mechanism_recovered` only when the required control, vulnerable, and protected pattern
 passes every evaluator invariant. This is a local synthetic engineering result, not a finding about
 an external system.
+
+The `risi-c-reference` manifest requests exactly four episodes and twelve retrieval calls. Its
+result is `controlled_mechanism_recovered` only when the vulnerable pair reaches advantage `0.5`,
+the pure-read ablation remains at `0.0`, the canary is absent from observer evidence, the probe
+budget is exact, the shared counter is the sole vulnerable-pair state mediator, and all four region
+decisions are safe.
 
 ## Autonomous operation
 

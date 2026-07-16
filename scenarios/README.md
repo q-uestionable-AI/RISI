@@ -15,3 +15,8 @@ hash verification, seed authorization, referenced-memory existence, and input ce
 The DEP-01 examples include a pure-read baseline and a separately approval-bound controlled CRAF
 comparison. The comparison uses only authorized truthful retrievals, preserves source memories,
 and separates target-visible policy state from evaluator-only truth and criticality.
+
+The DEP-02 example is a separately approval-bound controlled RISI-C comparison. It runs vulnerable
+and pure-read sham/hidden pairs from one snapshot, limits the observer to one authorized query, and
+keeps canary assignment, full state, traces, evaluator material, and timing outside the observer
+view.
