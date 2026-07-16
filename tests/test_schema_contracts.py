@@ -4,6 +4,14 @@ from dataclasses import fields
 from pathlib import Path
 
 from risi.canonical import canonical_sha256
+from risi.confidentiality import (
+    ObserverExchange,
+    ObserverView,
+    RisiCArm,
+    RisiCClassification,
+    RisiCComparisonResult,
+    RisiCPair,
+)
 from risi.craf import CrafArm, CrafClassification, CrafComparisonResult, InfluenceLossStage
 from risi.models import (
     EpisodeIdentity,
@@ -66,6 +74,25 @@ def test_craf_assessment_schema_vocabulary_matches_python_enums() -> None:
     assert set(arm["loss_stage"]["enum"]) == {item.value for item in InfluenceLossStage}
     assert set(schema["properties"]["result"]["enum"]) == {
         item.value for item in CrafComparisonResult
+    }
+
+
+def test_risi_c_schemas_match_python_contracts_and_enums() -> None:
+    assessment = _load_json(SCHEMA_ROOT / "risi-c-assessment.schema.json")
+    pair = assessment["$defs"]["pair"]["properties"]
+    arm = assessment["$defs"]["arm"]["properties"]
+
+    assert set(pair["pair"]["enum"]) == {item.value for item in RisiCPair}
+    assert set(pair["classification"]["enum"]) == {item.value for item in RisiCClassification}
+    assert set(arm["arm"]["enum"]) == {item.value for item in RisiCArm}
+    assert set(assessment["properties"]["result"]["enum"]) == {
+        item.value for item in RisiCComparisonResult
+    }
+
+    observer = _load_json(SCHEMA_ROOT / "observer-view.schema.json")
+    assert set(observer["required"]) == {field.name for field in fields(ObserverView)}
+    assert set(observer["$defs"]["exchange"]["required"]) == {
+        field.name for field in fields(ObserverExchange)
     }
 
 
@@ -190,6 +217,10 @@ def test_invalid_fixtures_exercise_declared_schema_guards() -> None:
         "capabilities"
     ]["items"]["enum"]
     assert set(manifest["capabilities"]) - set(capability_enum) == {"network.connect"}
+
+    observer_schema = _load_json(SCHEMA_ROOT / "observer-view.schema.json")
+    observer = _load_json(FIXTURE_ROOT / "invalid" / "observer-view-evaluator-leak.json")
+    assert set(observer) - set(observer_schema["properties"]) == {"hidden_assignment"}
 
 
 def test_valid_dep_01_fixture_preserves_evaluator_boundary() -> None:

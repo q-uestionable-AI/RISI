@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/q-uestionable-AI/RISI/schemas/risi-c-assessment.schema.json",
+  "title": "RISI-C controlled comparison assessment",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "scenario_id",
+    "shared_initial_state_sha256",
+    "result",
+    "pairs"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "scenario_id": { "type": "string", "minLength": 1 },
+    "shared_initial_state_sha256": { "$ref": "#/$defs/hash" },
+    "result": { "enum": ["controlled_mechanism_recovered", "comparison_failed"] },
+    "pairs": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": { "$ref": "#/$defs/pair" }
+    }
+  },
+  "$defs": {
+    "pair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pair",
+        "classification",
+        "accuracy",
+        "advantage",
+        "canary_absent",
+        "observer_budget_respected",
+        "sole_mediator",
+        "state_differences",
+        "arms"
+      ],
+      "properties": {
+        "pair": { "enum": ["vulnerable", "pure_read"] },
+        "classification": {
+          "enum": ["risi_c", "no_failure", "direct_disclosure", "confounded", "inconclusive"]
+        },
+        "accuracy": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "advantage": { "type": "number", "minimum": 0.0, "maximum": 0.5 },
+        "canary_absent": { "type": "boolean" },
+        "observer_budget_respected": { "type": "boolean" },
+        "sole_mediator": { "type": "boolean" },
+        "state_differences": {
+          "type": "array",
+          "maxItems": 1,
+          "items": { "$ref": "#/$defs/stateDifference" }
+        },
+        "arms": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": { "$ref": "#/$defs/arm" }
+        }
+      }
+    },
+    "stateDifference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "no_hidden_present",
+        "no_hidden_value",
+        "hidden_present",
+        "hidden_value"
+      ],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "no_hidden_present": { "type": "boolean" },
+        "no_hidden_value": {},
+        "hidden_present": { "type": "boolean" },
+        "hidden_value": {}
+      }
+    },
+    "arm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "arm",
+        "label",
+        "prediction",
+        "correct",
+        "observer_view_sha256",
+        "final_state_sha256"
+      ],
+      "properties": {
+        "arm": { "enum": ["sham", "hidden"] },
+        "label": { "enum": [0, 1] },
+        "prediction": { "type": ["integer", "null"], "minimum": 0, "maximum": 1 },
+        "correct": { "type": "boolean" },
+        "observer_view_sha256": { "$ref": "#/$defs/hash" },
+        "final_state_sha256": { "$ref": "#/$defs/hash" }
+      }
+    },
+    "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}

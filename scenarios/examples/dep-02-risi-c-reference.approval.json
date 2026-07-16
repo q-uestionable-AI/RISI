@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "manifest_sha256": "9ae2e965cef01f247de88e3c7f30d9f5b50d6e77090eb9f8cfa655ee33244eb6",
+  "approved_by": "example-operator",
+  "capabilities": [
+    "scenario.read",
+    "artifact.write",
+    "reference.execute",
+    "evidence.verify"
+  ],
+  "note": "Repository example for the synthetic DEP-02 controlled RISI-C comparison."
+}

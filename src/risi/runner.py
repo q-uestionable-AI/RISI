@@ -13,6 +13,16 @@ from risi.artifacts import (
     json_lines_bytes,
 )
 from risi.canonical import JsonValue
+from risi.confidentiality import (
+    ObserverExchange,
+    ObserverView,
+    RisiCArm,
+    RisiCComparisonAssessment,
+    RisiCPair,
+    RisiCPairAssessment,
+    assess_risi_c_comparison,
+    assess_risi_c_pair,
+)
 from risi.craf import (
     CrafArm,
     CrafAssessment,
@@ -21,7 +31,11 @@ from risi.craf import (
     assess_craf_comparison,
     assess_craf_trial,
 )
-from risi.decision import DecisionRequest, DeterministicApprovalProvider
+from risi.decision import (
+    DecisionRequest,
+    DeterministicApprovalProvider,
+    DeterministicRegionProvider,
+)
 from risi.evaluator import DecisionAssessment, MemoryOracle, evaluate_decision
 from risi.models import (
     EpisodeIdentity,
@@ -40,12 +54,13 @@ from risi.operator.models import ApprovalRecord, CommandResult, ResultStatus, Ru
 from risi.operator.safety import (
     CRAF_REFERENCE_POLICY,
     LOCAL_REFERENCE_POLICY,
+    RISI_C_REFERENCE_POLICY,
     AuthorizationDecision,
     authorize_run,
     resolve_artifact_root,
     resolve_existing_path,
 )
-from risi.scenarios import SyntheticScenario, load_scenario
+from risi.scenarios import RegionDecisionProtocol, SyntheticScenario, load_scenario
 from risi.trace import event_to_json, state_snapshot_hash, verify_trace
 
 
@@ -139,11 +154,32 @@ class _CrafArmMaterial:
     events: tuple[TraceEvent, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class _RisiCArmMaterial:
+    pair: RisiCPair
+    arm: RisiCArm
+    policy: PolicyConfiguration
+    final_state: StateSnapshot
+    victim_query: RetrievalQuery
+    victim_retrieval: RetrievalResult
+    victim_context: str
+    observer_query: RetrievalQuery
+    observer_retrieval: RetrievalResult
+    observer_view: ObserverView
+    decision_query: RetrievalQuery
+    decision_retrieval: RetrievalResult
+    decision_context: str
+    decision: ProposedDecision
+    decision_assessment: DecisionAssessment
+    events: tuple[TraceEvent, ...]
+
+
 def capabilities_result() -> CommandResult:
     """Return implemented profiles and hard safety boundaries."""
     profiles: list[JsonValue] = [
         LOCAL_REFERENCE_POLICY.to_json(),
         CRAF_REFERENCE_POLICY.to_json(),
+        RISI_C_REFERENCE_POLICY.to_json(),
     ]
     future_profiles: list[JsonValue] = [
         {
@@ -164,6 +200,38 @@ def capabilities_result() -> CommandResult:
         status=ResultStatus.OK,
         data={"profiles": profiles, "future_profiles": future_profiles},
     )
+
+
+def _validate_craf_run_contract(manifest: RunManifest, scenario: SyntheticScenario) -> None:
+    if scenario.craf_reference is None:
+        raise ValueError("craf-reference policy requires a craf_reference protocol")
+    if manifest.limits.episodes < 3:
+        raise ValueError("craf-reference requires an episodes limit of at least 3")
+    required_retrievals = 3 * (scenario.craf_reference.interaction_count + 1)
+    if manifest.limits.retrieval_calls < required_retrievals:
+        raise ValueError("craf-reference retrieval_calls limit is too small")
+    if scenario.risi_c_reference is not None:
+        raise ValueError("craf-reference cannot execute a risi_c_reference protocol")
+
+
+def _validate_risi_c_run_contract(manifest: RunManifest, scenario: SyntheticScenario) -> None:
+    if scenario.risi_c_reference is None or scenario.risi_c_oracle is None:
+        raise ValueError("risi-c-reference requires its protocol and evaluator oracle")
+    if not isinstance(scenario.protocol, RegionDecisionProtocol):
+        raise TypeError("risi-c-reference requires a region decision protocol")
+    if scenario.craf_reference is not None:
+        raise ValueError("risi-c-reference cannot execute a craf_reference protocol")
+    if manifest.limits.episodes < 4:
+        raise ValueError("risi-c-reference requires an episodes limit of at least 4")
+    if manifest.limits.retrieval_calls < 12:
+        raise ValueError("risi-c-reference retrieval_calls limit is too small")
+
+
+def _validate_pure_read_run_contract(manifest: RunManifest, scenario: SyntheticScenario) -> None:
+    if scenario.craf_reference is not None or scenario.risi_c_reference is not None:
+        raise ValueError("pure-read policy cannot execute an adaptive reference protocol")
+    if scenario.protocol.top_k > manifest.limits.retrieval_calls:
+        raise ValueError("scenario top_k exceeds the approved retrieval_calls limit")
 
 
 def validate_run(
@@ -200,17 +268,11 @@ def validate_run(
         expected_sha256=manifest.scenario_sha256,
     )
     if manifest.policy == CRAF_REFERENCE_POLICY.policy:
-        if scenario.craf_reference is None:
-            raise ValueError("craf-reference policy requires a craf_reference protocol")
-        if manifest.limits.episodes < 3:
-            raise ValueError("craf-reference requires an episodes limit of at least 3")
-        required_retrievals = 3 * (scenario.craf_reference.interaction_count + 1)
-        if manifest.limits.retrieval_calls < required_retrievals:
-            raise ValueError("craf-reference retrieval_calls limit is too small")
-    elif scenario.craf_reference is not None:
-        raise ValueError("pure-read policy cannot execute a craf_reference protocol")
-    elif scenario.protocol.top_k > manifest.limits.retrieval_calls:
-        raise ValueError("scenario top_k exceeds the approved retrieval_calls limit")
+        _validate_craf_run_contract(manifest, scenario)
+    elif manifest.policy == RISI_C_REFERENCE_POLICY.policy:
+        _validate_risi_c_run_contract(manifest, scenario)
+    else:
+        _validate_pure_read_run_contract(manifest, scenario)
     return ValidatedRun(manifest, approval, authorization, scenario_path, scenario)
 
 
@@ -247,6 +309,8 @@ def _execute_run(validated: ValidatedRun, artifact_root: Path) -> RunExecution:
     """
     if validated.manifest.policy == CRAF_REFERENCE_POLICY.policy:
         return _execute_craf_reference(validated, artifact_root)
+    if validated.manifest.policy == RISI_C_REFERENCE_POLICY.policy:
+        return _execute_risi_c_reference(validated, artifact_root)
     return _execute_pure_read(validated, artifact_root)
 
 
@@ -580,6 +644,240 @@ def _execute_craf_arm(
     )
 
 
+def _execute_risi_c_reference(validated: ValidatedRun, artifact_root: Path) -> RunExecution:
+    """Execute the approved four-arm DEP-02 RISI-C reference comparison."""
+    manifest = validated.manifest
+    scenario = validated.scenario
+    protocol = scenario.risi_c_reference
+    oracle = scenario.risi_c_oracle
+    if protocol is None or oracle is None:
+        raise AssertionError("validated risi-c-reference run is missing its contracts")
+    if not isinstance(scenario.protocol, RegionDecisionProtocol):
+        raise TypeError("validated risi-c-reference run is missing its region protocol")
+    resolved_artifact_root = resolve_artifact_root(artifact_root)
+    episode = EpisodeIdentity(
+        scenario_id=scenario.scenario_id,
+        episode_id=scenario.evaluator.episode_id,
+        seed=manifest.seed,
+    )
+    memory_ids: list[JsonValue] = [memory.memory_id for memory in scenario.memories]
+    memory_ids.sort()
+    top_k = max(scenario.protocol.top_k, protocol.event_top_k, protocol.observer_top_k)
+    initial_state = StateSnapshot(
+        snapshot_version=1,
+        episode=episode,
+        logical_time=scenario.logical_time,
+        next_event_sequence=0,
+        source_memories=scenario.memories,
+        derived_state={"shared_access_counter": 0},
+        indexes={"memory_ids": memory_ids},
+        queues={"maintenance": []},
+        policy=PolicyConfiguration(
+            PolicyIdentity("pure-read", "1"),
+            {"top_k": top_k, "read_side_updates": False},
+        ),
+        policy_state={},
+    )
+    critical_oracle = _critical_oracle(scenario)
+    critical_memory = _memory_by_id(initial_state, critical_oracle.memory_id)
+    if critical_memory.system_criticality != "protected-recall":
+        raise ValueError("risi-c-reference requires the protected-recall decision policy")
+    policies = {
+        RisiCPair.VULNERABLE: PolicyConfiguration(
+            PolicyIdentity("risi-shared-counter", "1"),
+            {
+                "top_k": top_k,
+                "read_side_updates": True,
+                "canary_memory_id": oracle.canary_memory_id,
+                "victim_principal_id": oracle.victim_principal_id,
+                "observer_principal_id": oracle.observer_principal_id,
+                "no_hidden_signal_memory_id": oracle.no_hidden_signal_memory_id,
+                "hidden_signal_memory_id": oracle.hidden_signal_memory_id,
+            },
+        ),
+        RisiCPair.PURE_READ: PolicyConfiguration(
+            PolicyIdentity("pure-read", "1"),
+            {"top_k": top_k, "read_side_updates": False},
+        ),
+    }
+    arms = tuple(
+        _execute_risi_c_arm(validated, initial_state, pair, arm, policies[pair])
+        for pair in RisiCPair
+        for arm in RisiCArm
+    )
+    by_identity = {(material.pair, material.arm): material for material in arms}
+    pair_assessments: dict[RisiCPair, RisiCPairAssessment] = {}
+    for pair in RisiCPair:
+        sham = by_identity[(pair, RisiCArm.SHAM)]
+        hidden = by_identity[(pair, RisiCArm.HIDDEN)]
+        pair_assessments[pair] = assess_risi_c_pair(
+            pair,
+            sham.final_state,
+            hidden.final_state,
+            sham.observer_view,
+            hidden.observer_view,
+            oracle,
+        )
+    comparison = assess_risi_c_comparison(
+        scenario.scenario_id,
+        state_snapshot_hash(initial_state),
+        pair_assessments[RisiCPair.VULNERABLE],
+        pair_assessments[RisiCPair.PURE_READ],
+    )
+    files, execution = _risi_c_evidence_files(validated, initial_state, arms, comparison)
+    verification = create_evidence_bundle(
+        resolved_artifact_root,
+        manifest.run_id,
+        files,
+        max_bytes=manifest.limits.artifact_bytes,
+    )
+    bundle_path = resolved_artifact_root / manifest.run_id
+    result = CommandResult(
+        command="run",
+        status=ResultStatus.OK,
+        run_id=manifest.run_id,
+        data={
+            "scenario_id": scenario.scenario_id,
+            "episode_id": episode.episode_id,
+            "comparison_result": comparison.result.value,
+            "bundle_path": str(bundle_path),
+            "inventory_sha256": verification.inventory_sha256,
+            "bundle_hash": verification.bundle_hash,
+            "event_count": execution["event_count"],
+            "pairs": execution["pairs"],
+        },
+    )
+    return RunExecution(result, bundle_path, verification)
+
+
+def _execute_risi_c_arm(
+    validated: ValidatedRun,
+    initial_state: StateSnapshot,
+    pair: RisiCPair,
+    arm: RisiCArm,
+    policy: PolicyConfiguration,
+) -> _RisiCArmMaterial:
+    scenario = validated.scenario
+    protocol = scenario.risi_c_reference
+    oracle = scenario.risi_c_oracle
+    if (
+        protocol is None
+        or oracle is None
+        or not isinstance(scenario.protocol, RegionDecisionProtocol)
+    ):
+        raise AssertionError("risi-c-reference contracts are required")
+    adapter = ReferenceMemoryAdapter(initial_state)
+    adapter.record_event(
+        EventType.EPISODE_STARTED,
+        EventVisibility.EVALUATOR,
+        {
+            "pair": pair.value,
+            "arm": arm.value,
+            "manifest_sha256": validated.manifest.digest,
+            "profile": validated.manifest.profile.value,
+        },
+    )
+    adapter.configure_policy(policy)
+    victim_query = RetrievalQuery(
+        principal_id=protocol.victim_principal_id,
+        tenant_id=protocol.tenant_id,
+        text=protocol.hidden_query if arm is RisiCArm.HIDDEN else protocol.sham_query,
+        top_k=protocol.event_top_k,
+    )
+    victim_retrieval = adapter.retrieve(victim_query)
+    victim_context = adapter.assemble_context(victim_retrieval)
+    expected_victim_memory = (
+        oracle.canary_memory_id if arm is RisiCArm.HIDDEN else oracle.sham_memory_id
+    )
+    if tuple(hit.memory_id for hit in victim_retrieval.hits) != (expected_victim_memory,):
+        raise ValueError("risi-c-reference victim event did not isolate its expected memory")
+
+    observer_query = RetrievalQuery(
+        principal_id=protocol.observer_principal_id,
+        tenant_id=protocol.tenant_id,
+        text=protocol.observer_query,
+        top_k=protocol.observer_top_k,
+    )
+    observer_retrieval = adapter.retrieve(observer_query)
+    adapter.assemble_context(observer_retrieval)
+    observer_ids = tuple(hit.memory_id for hit in observer_retrieval.hits)
+    observer_contents = tuple(
+        _memory_by_id(adapter.inspect_state(), memory_id).content for memory_id in observer_ids
+    )
+    observer_view = ObserverView(
+        principal_id=protocol.observer_principal_id,
+        exchanges=(
+            ObserverExchange(
+                query_index=0,
+                query=observer_query,
+                response_memory_ids=observer_ids,
+                response_contents=observer_contents,
+                metadata={"result_count": len(observer_ids)},
+            ),
+        ),
+    )
+
+    decision_query = RetrievalQuery(
+        principal_id=scenario.protocol.principal_id,
+        tenant_id=scenario.protocol.tenant_id,
+        text=scenario.protocol.query,
+        top_k=scenario.protocol.top_k,
+    )
+    decision_retrieval = adapter.retrieve(decision_query)
+    decision_context = adapter.assemble_context(decision_retrieval)
+    provider = DeterministicRegionProvider()
+    if provider.provider_id != validated.manifest.decision_provider:
+        raise ValueError("registered decision provider does not match the manifest")
+    decision = provider.propose(
+        DecisionRequest(
+            episode=initial_state.episode,
+            context=decision_context,
+            retrieval=decision_retrieval,
+            facts=scenario.facts,
+            protocol=scenario.protocol,
+        )
+    )
+    adapter.record_event(
+        EventType.DECISION,
+        EventVisibility.BOTH,
+        {"decision": decision.to_json()},
+    )
+    decision_assessment = evaluate_decision(decision, scenario.evaluator.decision_oracle)
+    adapter.record_event(
+        EventType.ORACLE_EVALUATED,
+        EventVisibility.EVALUATOR,
+        {"decision_assessment": decision_assessment.to_json()},
+    )
+    adapter.record_event(
+        EventType.EPISODE_COMPLETED,
+        EventVisibility.EVALUATOR,
+        {"pair": pair.value, "arm": arm.value, "safe": decision_assessment.safe},
+    )
+    final_state = adapter.inspect_state()
+    if final_state.source_memories != initial_state.source_memories:
+        raise ValueError("risi-c-reference changed source memories")
+    events = adapter.export_trace()
+    verify_trace(events)
+    return _RisiCArmMaterial(
+        pair=pair,
+        arm=arm,
+        policy=policy,
+        final_state=final_state,
+        victim_query=victim_query,
+        victim_retrieval=victim_retrieval,
+        victim_context=victim_context,
+        observer_query=observer_query,
+        observer_retrieval=observer_retrieval,
+        observer_view=observer_view,
+        decision_query=decision_query,
+        decision_retrieval=decision_retrieval,
+        decision_context=decision_context,
+        decision=decision,
+        decision_assessment=decision_assessment,
+        events=events,
+    )
+
+
 def _critical_oracle(scenario: SyntheticScenario) -> MemoryOracle:
     critical = tuple(
         oracle for oracle in scenario.evaluator.memory_oracles if oracle.oracle_criticality
@@ -593,11 +891,16 @@ def _critical_oracle_applicable(
     scenario: SyntheticScenario,
     oracle: MemoryOracle,
 ) -> bool:
-    environment = oracle.applicability.get("environment")
-    minimum_approvals = oracle.applicability.get("minimum_approvals")
+    protocol = scenario.protocol
+    if isinstance(protocol, RegionDecisionProtocol):
+        return (
+            oracle.applicability.get("dataset_class")
+            == scenario.facts.get(protocol.dataset_class_fact)
+            and oracle.applicability.get("prohibited_region") == protocol.prohibited_region
+        )
     return (
-        environment == scenario.facts.get("target_environment")
-        and minimum_approvals == scenario.protocol.minimum_approvals
+        oracle.applicability.get("environment") == scenario.facts.get("target_environment")
+        and oracle.applicability.get("minimum_approvals") == protocol.minimum_approvals
     )
 
 
@@ -634,6 +937,7 @@ def _craf_evidence_files(
     execution: dict[str, JsonValue] = {
         "schema_version": 1,
         "run_id": manifest.run_id,
+        "scenario_id": validated.scenario.scenario_id,
         "manifest_sha256": manifest.digest,
         "episode_id": validated.scenario.evaluator.episode_id,
         "policy": manifest.policy,
@@ -678,6 +982,128 @@ def _craf_evidence_files(
         )
     files["report.md"] = _render_craf_report(execution, comparison).encode()
     return files, execution
+
+
+def _risi_c_evidence_files(
+    validated: ValidatedRun,
+    initial_state: StateSnapshot,
+    arms: tuple[_RisiCArmMaterial, ...],
+    comparison: RisiCComparisonAssessment,
+) -> tuple[dict[str, bytes], dict[str, JsonValue]]:
+    manifest = validated.manifest
+    pair_assessments = {pair.pair: pair for pair in comparison.pairs}
+    pair_summaries: list[JsonValue] = []
+    for pair in RisiCPair:
+        assessment = pair_assessments[pair]
+        arm_summaries: list[JsonValue] = [
+            {
+                "arm": material.arm.value,
+                "safe": material.decision_assessment.safe,
+                "final_state_hash": state_snapshot_hash(material.final_state),
+                "observer_view_hash": next(
+                    arm.observer_view_sha256 for arm in assessment.arms if arm.arm is material.arm
+                ),
+                "event_count": len(material.events),
+            }
+            for material in arms
+            if material.pair is pair
+        ]
+        pair_summaries.append(
+            {
+                "pair": pair.value,
+                "classification": assessment.classification.value,
+                "advantage": assessment.advantage,
+                "sole_mediator": assessment.sole_mediator,
+                "arms": arm_summaries,
+            }
+        )
+    execution: dict[str, JsonValue] = {
+        "schema_version": 1,
+        "run_id": manifest.run_id,
+        "scenario_id": validated.scenario.scenario_id,
+        "manifest_sha256": manifest.digest,
+        "episode_id": validated.scenario.evaluator.episode_id,
+        "policy": manifest.policy,
+        "status": "succeeded",
+        "comparison_result": comparison.result.value,
+        "initial_state_hash": state_snapshot_hash(initial_state),
+        "event_count": sum(len(arm.events) for arm in arms),
+        "pairs": pair_summaries,
+    }
+    files = {
+        "manifest.json": json_bytes(manifest.to_json()),
+        "approval.json": json_bytes(validated.approval.to_json()),
+        "target-scenario.json": json_bytes(validated.scenario.target_view()),
+        "evaluator/evaluator-state.json": json_bytes(validated.scenario.evaluator_view()),
+        "evaluator/risi-c-comparison.json": json_bytes(comparison.to_json()),
+        "evaluator/initial-state.json": json_bytes(initial_state.to_json()),
+        "execution.json": json_bytes(execution),
+    }
+    for material in arms:
+        prefix = f"pairs/{material.pair.value}/arms/{material.arm.value}"
+        evaluator_prefix = f"evaluator/{prefix}"
+        files[f"{evaluator_prefix}/final-state.json"] = json_bytes(material.final_state.to_json())
+        files[f"{evaluator_prefix}/events.jsonl"] = json_lines_bytes(
+            tuple(event_to_json(event) for event in material.events)
+        )
+        files[f"{evaluator_prefix}/victim-event.json"] = json_bytes(
+            {
+                "query": material.victim_query.to_json(),
+                "result": material.victim_retrieval.to_json(),
+                "context": material.victim_context,
+            }
+        )
+        files[f"observer/{prefix}/view.json"] = json_bytes(material.observer_view.to_json())
+        files[f"target/{prefix}/decision-retrieval.json"] = json_bytes(
+            {
+                "query": material.decision_query.to_json(),
+                "result": material.decision_retrieval.to_json(),
+            }
+        )
+        files[f"target/{prefix}/decision-context.json"] = json_bytes(
+            {"context": material.decision_context}
+        )
+        files[f"target/{prefix}/decision.json"] = json_bytes(material.decision.to_json())
+        files[f"{evaluator_prefix}/decision-assessment.json"] = json_bytes(
+            material.decision_assessment.to_json()
+        )
+    files["report.md"] = _render_risi_c_report(execution, comparison).encode()
+    return files, execution
+
+
+def _render_risi_c_report(
+    execution: dict[str, JsonValue],
+    comparison: RisiCComparisonAssessment,
+) -> str:
+    lines = [
+        "# RISI controlled RISI-C reference report",
+        "",
+        f"- Run: `{execution['run_id']}`",
+        f"- Episode: `{execution['episode_id']}`",
+        f"- Result: **{comparison.result.value}**",
+        f"- Shared initial state: `{comparison.shared_initial_state_sha256}`",
+        f"- Total events: {execution['event_count']}",
+        "",
+        "## Pairs",
+        "",
+    ]
+    lines.extend(
+        f"- `{pair.pair.value}`: `{pair.classification.value}`; "
+        f"advantage={pair.advantage:.1f}; sole_mediator={str(pair.sole_mediator).lower()}"
+        for pair in comparison.pairs
+    )
+    lines.extend(
+        [
+            "",
+            "The observer view contains only its own authorized query, response, and result count.",
+            "The opaque canary, hidden assignment, traces, full state, and evaluator oracle are",
+            "excluded. Wall-clock timing is not part of the observer view or classifier.",
+            "This is controlled local mechanism recovery, not an external vulnerability finding.",
+            "No deployment or other external action was executed.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
 
 
 def _render_craf_report(

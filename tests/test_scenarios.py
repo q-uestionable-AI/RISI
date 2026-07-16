@@ -8,6 +8,7 @@ from risi.scenarios import load_scenario
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SCENARIO = PROJECT_ROOT / "scenarios" / "examples" / "dep-01-pure-read.json"
 CRAF_SCENARIO = PROJECT_ROOT / "scenarios" / "examples" / "dep-01-craf.json"
+RISI_C_SCENARIO = PROJECT_ROOT / "scenarios" / "examples" / "dep-02-risi-c.json"
 
 
 def test_dep_01_scenario_loads_with_structural_oracle_separation() -> None:
@@ -76,3 +77,26 @@ def test_craf_scenario_loads_truthful_authorized_interaction_protocol() -> None:
             max_input_bytes=10,
             max_memory_records=100,
         )
+
+
+def test_risi_c_scenario_loads_with_strict_observer_oracle_separation() -> None:
+    scenario = load_scenario(
+        RISI_C_SCENARIO,
+        run_id="dep-02-risi-c-test",
+        seed=23,
+        max_input_bytes=100_000,
+        max_memory_records=100,
+    )
+
+    assert scenario.risi_c_reference is not None
+    assert scenario.risi_c_oracle is not None
+    assert scenario.risi_c_reference.probe_count == 1
+    assert scenario.risi_c_reference.observer_principal_id == "ops-niko"
+    assert scenario.risi_c_oracle.allowed_state_diff_path == (
+        "/derived_state/shared_access_counter"
+    )
+    target = scenario.target_view()
+    evaluator = scenario.evaluator_view()
+    assert "risi_c_reference" in target
+    assert "risi_c_oracle" not in target
+    assert "risi_c_oracle" in evaluator

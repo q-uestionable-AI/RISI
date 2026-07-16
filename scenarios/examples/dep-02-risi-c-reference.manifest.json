@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "run_id": "dep-02-risi-c-reference",
+  "profile": "local-reference",
+  "scenario_path": "examples/dep-02-risi-c.json",
+  "scenario_sha256": "5e7e45b3080a67040da10395ba4a2975c62299abf5663fe784d9e14d4d815fa4",
+  "seed": 23,
+  "adapter": "reference",
+  "decision_provider": "deterministic-region",
+  "policy": "risi-c-reference",
+  "capabilities": [
+    "scenario.read",
+    "artifact.write",
+    "reference.execute",
+    "evidence.verify"
+  ],
+  "limits": {
+    "episodes": 4,
+    "retrieval_calls": 12,
+    "logical_steps": 20,
+    "input_bytes": 100000,
+    "memory_records": 100,
+    "artifact_bytes": 5000000
+  }
+}

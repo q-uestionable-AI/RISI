@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/q-uestionable-AI/RISI/schemas/observer-view.schema.json",
+  "title": "RISI-C authorized observer view",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["principal_id", "exchanges"],
+  "properties": {
+    "principal_id": { "type": "string", "minLength": 1 },
+    "exchanges": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": { "$ref": "#/$defs/exchange" }
+    }
+  },
+  "$defs": {
+    "exchange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "query_index",
+        "query",
+        "response_memory_ids",
+        "response_contents",
+        "metadata"
+      ],
+      "properties": {
+        "query_index": { "const": 0 },
+        "query": { "$ref": "#/$defs/query" },
+        "response_memory_ids": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "response_contents": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["result_count"],
+          "properties": { "result_count": { "const": 1 } }
+        }
+      }
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["principal_id", "tenant_id", "text", "top_k"],
+      "properties": {
+        "principal_id": { "type": "string", "minLength": 1 },
+        "tenant_id": { "type": "string", "minLength": 1 },
+        "text": { "type": "string", "minLength": 1 },
+        "top_k": { "const": 1 }
+      }
+    }
+  }
+}

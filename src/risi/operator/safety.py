@@ -122,6 +122,23 @@ CRAF_REFERENCE_POLICY = SafetyPolicy(
 )
 
 
+RISI_C_REFERENCE_POLICY = SafetyPolicy(
+    profile=ExecutionProfile.LOCAL_REFERENCE,
+    capabilities=LOCAL_REFERENCE_POLICY.capabilities,
+    adapter="reference",
+    decision_provider="deterministic-region",
+    policy="risi-c-reference",
+    ceilings=ExecutionLimits(
+        episodes=4,
+        retrieval_calls=12,
+        logical_steps=100,
+        input_bytes=1_000_000,
+        memory_records=10_000,
+        artifact_bytes=20_000_000,
+    ),
+)
+
+
 def safety_policy_for_manifest(manifest: RunManifest) -> SafetyPolicy:
     """Select a closed built-in policy for an operator manifest.
 
@@ -134,6 +151,8 @@ def safety_policy_for_manifest(manifest: RunManifest) -> SafetyPolicy:
     """
     if manifest.policy == CRAF_REFERENCE_POLICY.policy:
         return CRAF_REFERENCE_POLICY
+    if manifest.policy == RISI_C_REFERENCE_POLICY.policy:
+        return RISI_C_REFERENCE_POLICY
     return LOCAL_REFERENCE_POLICY
 
 

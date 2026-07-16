@@ -24,9 +24,9 @@ Integrity verification, model-free replay, and generated report
 ```
 
 The implemented `local-reference` profile statically registers the reference memory adapter,
-deterministic approval provider, pure-read baseline, and closed `craf-reference` comparison policy.
-It denies network access, subprocesses, credentials, dynamic plugins, source-memory writes, and
-manifest-defined policy grants.
+deterministic approval and region providers, pure-read baseline, and closed `craf-reference` and
+`risi-c-reference` comparison policies. It denies network access, subprocesses, credentials,
+dynamic plugins, source-memory writes, and manifest-defined policy grants.
 
 ## Control plane and data plane
 
@@ -48,6 +48,10 @@ adaptive metadata. Oracle criticality, applicability, truth, and safe-action rul
 separate evaluator object and separate evidence files. They are never supplied to retrieval or the
 decision provider.
 
+DEP-02 adds a narrower observer boundary. An observer view contains only that principal's own
+authorized query, ordered response identifiers and contents, and result count. It excludes the
+canary, hidden assignment, traces, full state, evaluator material, and wall-clock timing.
+
 Full-state snapshots cover source memories, derived state, indexes, queues, policy configuration,
 policy state, logical time, and event sequence. The pure-read reference adapter changes only trace
 bookkeeping. The controlled memory-eclipsing and protected policies may change only the explicitly
@@ -67,7 +71,23 @@ Replay is model-free. It verifies the bundle and each trace, applies pure-read b
 closed policy-configuration and memory-eclipsing state transitions to the shared initial snapshot,
 and requires every reconstructed state to match its recorded final snapshot. Controlled CRAF replay
 also cross-checks retained retrieval, context, decision, evaluator, source-preservation, and
-localization evidence.
+localization evidence. Controlled RISI-C replay reconstructs all four arms, verifies each retained
+observer and decision artifact against the trace, recomputes both paired assessments, and requires
+the vulnerable/pure-read comparison to match the recorded evaluator result.
+
+## RISI-C paired comparison
+
+The `risi-c-reference` policy runs vulnerable and pure-read pairs, each with a matched sham arm and
+hidden-retrieval arm. All four arms start from one canonical snapshot and execute one authorized
+observer probe. In the vulnerable hidden arm, retrieval of the opaque canary changes only
+`/derived_state/shared_access_counter`; the observer's otherwise identical query returns the
+designated hidden signal. In the pure-read pair, neither hidden nor sham retrieval changes state.
+
+The frozen evaluator classifies the vulnerable pair as RISI-C only when its advantage is at least
+`0.5`, the canary is absent from the observer views, the exact probe budget is respected, and the
+shared access counter is the sole paired state difference. The pure-read ablation must have
+advantage no greater than `0.0` with no state difference. This is controlled mechanism recovery,
+not evidence of an external vulnerability.
 
 ## Critical recall decomposition
 

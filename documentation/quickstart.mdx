@@ -1,6 +1,6 @@
 ---
 title: "Quickstart"
-description: "Run and verify the guarded deterministic DEP-01 baseline"
+description: "Run and verify the guarded deterministic DEP-01 and DEP-02 references"
 ---
 
 ## Prerequisites
@@ -15,8 +15,8 @@ risi --version
 risi capabilities --format json
 ```
 
-This installs the RISI library and CLI. The bundled DEP-01 scenario and approval files are source
-examples and are not included in the wheel.
+This installs the RISI library and CLI. The bundled DEP-01 and DEP-02 scenario, manifest, and
+approval files are source examples and are not included in the wheel.
 
 ## Prepare the source example
 
@@ -57,6 +57,18 @@ uv run risi replay artifacts/dep-01-craf-reference --format json
 This separately approval-bound example runs control, memory-eclipsing, and protected-recall arms
 from one shared snapshot. It is deterministic, synthetic, local-only, and executes no external
 action.
+
+## Execute the controlled RISI-C comparison
+
+```bash
+uv run risi validate scenarios/examples/dep-02-risi-c-reference.manifest.json --approval scenarios/examples/dep-02-risi-c-reference.approval.json --scenario-root scenarios --format json
+uv run risi run scenarios/examples/dep-02-risi-c-reference.manifest.json --approval scenarios/examples/dep-02-risi-c-reference.approval.json --scenario-root scenarios --artifact-root artifacts --format json
+uv run risi replay artifacts/dep-02-risi-c-reference --format json
+```
+
+This separately approval-bound example runs vulnerable and pure-read sham/hidden pairs from one
+shared snapshot. It uses one authorized observer probe per arm, keeps hidden assignment and
+evaluator state outside the observer view, and executes no external action.
 
 ## Verify, replay, and report
 

@@ -1,0 +1,18 @@
+{
+  "principal_id": "ops-niko",
+  "exchanges": [
+    {
+      "query_index": 0,
+      "query": {
+        "principal_id": "ops-niko",
+        "tenant_id": "aster-sim",
+        "text": "Aster API health status ready",
+        "top_k": 1
+      },
+      "response_memory_ids": ["DEP-HEALTH-ALPHA"],
+      "response_contents": ["Aster API health status ready alpha."],
+      "metadata": {"result_count": 1}
+    }
+  ],
+  "hidden_assignment": 0
+}
