@@ -118,8 +118,15 @@ def capabilities_result() -> CommandResult:
         {
             "profile": "authorized-local-inference",
             "status": "not-implemented",
-            "note": "Reserved for an exact allowlisted local or lab endpoint.",
-        }
+            "note": (
+                "Reserved for an exact allowlisted loopback or operator-controlled lab endpoint."
+            ),
+        },
+        {
+            "profile": "authorized-remote-inference",
+            "status": "not-implemented",
+            "note": "Reserved for an exact allowlisted public HTTPS endpoint and model.",
+        },
     ]
     return CommandResult(
         command="capabilities",

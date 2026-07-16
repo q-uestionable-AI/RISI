@@ -32,6 +32,20 @@ def test_smoke_command() -> None:
     assert result.stdout.strip() == "risi smoke: ok"
 
 
+def test_capabilities_reserve_remote_inference_without_enabling_it() -> None:
+    result = runner.invoke(app, ["capabilities", "--format", "json"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    implemented = {profile["profile"]: profile for profile in payload["data"]["profiles"]}
+    reserved = {profile["profile"]: profile for profile in payload["data"]["future_profiles"]}
+    assert set(implemented) == {"local-reference"}
+    assert implemented["local-reference"]["network"] == "denied"
+    assert implemented["local-reference"]["credentials"] == "denied"
+    assert set(reserved) == {"authorized-local-inference", "authorized-remote-inference"}
+    assert all(profile["status"] == "not-implemented" for profile in reserved.values())
+
+
 def test_json_schemas_are_parseable() -> None:
     schema_paths = sorted((PROJECT_ROOT / "schemas").glob("*.schema.json"))
 

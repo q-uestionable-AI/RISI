@@ -24,7 +24,8 @@ pure-read baseline. It includes:
 
 - strict run, approval, scenario, result, event, state, and evidence contracts;
 - a model-independent `local-reference` safety profile;
-- authorized deterministic retrieval and a replaceable decision-provider boundary;
+- authorized deterministic retrieval and a transport-neutral, replaceable decision-provider
+  boundary;
 - structurally separated target-visible and evaluator-only state;
 - full-state snapshots and hash-chained event telemetry;
 - atomic evidence bundles, integrity verification, model-free replay, and generated reports;
@@ -33,6 +34,10 @@ pure-read baseline. It includes:
 It does **not** implement an attack, vulnerable adaptive policy, external inference integration,
 database, consequential action, or external vulnerability finding. The authoritative research
 charter and research evidence remain outside this repository in the private research vault.
+
+Capability discovery reserves separate local/lab and remote public-HTTPS inference profiles for
+future, separately approved work. Both remain non-executable: they grant no networking,
+credentials, adapter registration, or model access in the implemented `local-reference` profile.
 
 ## Quickstart
 
@@ -61,6 +66,9 @@ All models—including an orchestrating model—are treated as untrusted callers
 enforces profile, capability, budget, approval, and path controls below the CLI. The implemented
 profile denies network access, subprocesses, credentials, dynamic plugins, and memory writes by
 construction. Host or network isolation remains necessary when future external adapters are used.
+Any future remote inference profile must bind approval to an exact endpoint, model, non-secret
+credential alias, generation parameters, network class, and request, token, time, retry, and spend
+ceilings while retaining redacted request and response evidence.
 
 ## Development and documentation
 
@@ -70,7 +78,8 @@ docstrings. See [CONTRIBUTING.md](CONTRIBUTING.md),
 [docs/architecture.md](docs/architecture.md).
 
 - `docs/` contains public engineering documentation and decision records.
-- `documentation/` contains Mintlify-ready source; no public site deployment is implied.
+- `documentation/` contains the source deployed at
+  [risi.mintlify.site](https://risi.mintlify.site).
 - `schemas/` contains versioned machine contracts.
 - `scenarios/` contains reviewed synthetic examples.
 - `artifacts/` is excluded from Git and contains local evidence bundles.
