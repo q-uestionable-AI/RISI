@@ -60,7 +60,12 @@ from risi.operator.safety import (
     resolve_artifact_root,
     resolve_existing_path,
 )
-from risi.scenarios import RegionDecisionProtocol, SyntheticScenario, load_scenario
+from risi.scenarios import (
+    ReferenceRunProtocol,
+    RegionDecisionProtocol,
+    SyntheticScenario,
+    load_scenario,
+)
 from risi.trace import event_to_json, state_snapshot_hash, verify_trace
 
 
@@ -230,6 +235,8 @@ def _validate_risi_c_run_contract(manifest: RunManifest, scenario: SyntheticScen
 def _validate_pure_read_run_contract(manifest: RunManifest, scenario: SyntheticScenario) -> None:
     if scenario.craf_reference is not None or scenario.risi_c_reference is not None:
         raise ValueError("pure-read policy cannot execute an adaptive reference protocol")
+    if not isinstance(scenario.protocol, ReferenceRunProtocol):
+        raise TypeError("pure-read policy requires an approval decision protocol")
     if scenario.protocol.top_k > manifest.limits.retrieval_calls:
         raise ValueError("scenario top_k exceeds the approved retrieval_calls limit")
 

@@ -110,6 +110,26 @@ def test_operator_schema_fields_match_python_contracts() -> None:
     assert set(limits_schema["required"]) == {field.name for field in fields(ExecutionLimits)}
 
 
+def test_manifest_schema_binds_each_policy_to_its_registered_decision_provider() -> None:
+    schema = _load_json(SCHEMA_ROOT / "run-manifest.schema.json")
+
+    assert set(schema["properties"]["decision_provider"]["enum"]) == {
+        "deterministic-approval",
+        "deterministic-region",
+    }
+    bindings = {
+        tuple(rule["if"]["properties"]["policy"].get("enum", []))
+        or (rule["if"]["properties"]["policy"]["const"],): rule["then"]["properties"][
+            "decision_provider"
+        ]["const"]
+        for rule in schema["allOf"]
+    }
+    assert bindings == {
+        ("risi-c-reference",): "deterministic-region",
+        ("pure-read", "craf-reference"): "deterministic-approval",
+    }
+
+
 def test_valid_event_fixture_matches_canonical_python_contract() -> None:
     fixture = _load_json(FIXTURE_ROOT / "valid" / "event.json")
     draft = TraceEventDraft(
