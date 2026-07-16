@@ -1,4 +1,4 @@
-# RISI
+# RISI Research Harness
 
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
 [![CI](https://github.com/q-uestionable-AI/RISI/actions/workflows/ci.yml/badge.svg)](https://github.com/q-uestionable-AI/RISI/actions/workflows/ci.yml)
