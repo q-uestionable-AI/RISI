@@ -1,6 +1,6 @@
 ---
 title: "Standalone Inference Servers"
-description: "How local or lab inference servers fit without becoming the primary harness"
+description: "How local, lab, or authorized cloud-hosted inference endpoints fit without becoming the primary harness"
 ---
 
 ## Two integration roles
@@ -13,20 +13,47 @@ A server exposing persistent memory or retrieval can implement `MemoryAdapter`. 
 server itself can become the authorized RISI or CRAF target, while evaluator snapshots and oracles
 remain outside its target-visible interface.
 
-## Reserved safety profile
+Deployment location does not change these roles. A cloud-hosted model can remain a
+`DecisionProvider`, while a cloud-hosted service that owns persistent retrieval state must satisfy
+the full `MemoryAdapter` snapshot, reset, trace, and evaluator-separation contract.
 
-`risi capabilities` reports `authorized-local-inference` as reserved and not implemented. It will
-not be accepted until its controls are implemented and approved. Those controls include:
+## Reserved safety profiles
 
-- an exact endpoint and model allowlist;
-- strict request, response, time, and retry budgets;
-- redirect and unexpected-origin rejection;
-- explicit credential policy;
-- deterministic request and response evidence;
-- operator approval bound to the endpoint configuration.
+`risi capabilities` reports two inference profiles as reserved and not implemented:
+
+- `authorized-local-inference` for an exact allowlisted loopback or operator-controlled lab
+  endpoint;
+- `authorized-remote-inference` for an exact allowlisted public HTTPS endpoint and model, such as a
+  separately authorized OpenAI-compatible deployment on Runpod.
+
+These declarations preserve future compatibility without granting network or credential access.
+Neither profile will be accepted until its controls are implemented, tested, and separately
+approved. Those controls include:
+
+- an immutable target specification covering endpoint origin and base path, model, network class,
+  non-secret credential alias, and generation parameters;
+- strict request, response, token, time, retry, and spend ceilings;
+- DNS and resolved-IP validation plus redirect and unexpected-origin rejection;
+- an explicit credential resolver that never records secret values in configuration or evidence;
+- complete redacted request and response evidence, including failures and timeouts;
+- operator approval bound to the exact target fingerprint and resource envelope.
+
+## Hosted inference endpoints
+
+The preferred future integration is a provider-neutral OpenAI-compatible decision adapter, not a
+Runpod-specific control plane. This keeps the same contract usable with Runpod Serverless, an
+authorized Runpod Pod, another hosted provider, or an operator-controlled local server. Provider
+deployment, lifecycle management, billing administration, and arbitrary endpoint discovery remain
+outside the harness.
+
+Remote output is captured evidence, not deterministic execution. Model-free replay must verify and
+rescore the retained request and response without contacting the provider; repeating a remote call
+is a new run, not replay.
 
 Application checks cannot guarantee process-level egress isolation. Local or lab inference testing
-must also use suitable host, container, firewall, or VLAN controls.
+must also use suitable host, container, firewall, or VLAN controls. Remote testing additionally
+requires egress restriction to the approved endpoint and connection-time enforcement of the
+approved DNS, IP, TLS, redirect, and origin policy.
 
 ## Optional agent integrations
 
