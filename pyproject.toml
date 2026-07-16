@@ -29,8 +29,11 @@ dependencies = [
 risi = "risi.cli:app"
 
 [project.urls]
+Homepage = "https://risi.q-uestionable.ai"
+Documentation = "https://risi.q-uestionable.ai"
 Repository = "https://github.com/q-uestionable-AI/RISI"
 Issues = "https://github.com/q-uestionable-AI/RISI/issues"
+Changelog = "https://risi.q-uestionable.ai/changelog"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/risi"]

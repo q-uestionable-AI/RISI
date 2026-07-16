@@ -43,6 +43,26 @@ class ExitCode(IntEnum):
     EXECUTION_FAILURE = 5
 
 
+def _version_callback(value: bool) -> None:
+    if value:
+        typer.echo(__version__)
+        raise typer.Exit
+
+
+@app.callback()
+def main(
+    version_requested: bool = typer.Option(
+        False,
+        "--version",
+        "-V",
+        callback=_version_callback,
+        is_eager=True,
+        help="Print the installed RISI package version and exit.",
+    ),
+) -> None:
+    """Operate the guarded RISI reference harness."""
+
+
 def _validate_format(format_name: str) -> None:
     if format_name not in {"text", "json"}:
         raise OperatorInputError("format must be 'text' or 'json'")

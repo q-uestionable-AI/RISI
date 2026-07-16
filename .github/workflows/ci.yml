@@ -91,3 +91,24 @@ jobs:
 
       - name: Dependency audit
         run: uv run pip-audit
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.11"
+
+      - name: Build distributions
+        run: uv build --clear --out-dir dist
+
+      - name: Smoke test built wheel
+        shell: bash
+        run: |
+          wheel="$(find dist -maxdepth 1 -type f -name 'risi-*.whl' -print -quit)"
+          test -n "$wheel"
+          uvx --from "$wheel" risi --version
+          uvx --from "$wheel" risi capabilities --format json

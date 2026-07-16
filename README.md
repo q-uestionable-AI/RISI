@@ -1,5 +1,13 @@
 # RISI
 
+[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
+[![CI](https://github.com/q-uestionable-AI/RISI/actions/workflows/ci.yml/badge.svg)](https://github.com/q-uestionable-AI/RISI/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/q-uestionable-AI/RISI/actions/workflows/codeql.yml/badge.svg)](https://github.com/q-uestionable-AI/RISI/actions/workflows/codeql.yml)
+[![PyPI](https://img.shields.io/pypi/v/risi.svg)](https://pypi.org/project/risi/)
+[![Python 3.11–3.13](https://img.shields.io/badge/python-3.11--3.13-blue.svg)](https://www.python.org/downloads/)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Docs](https://img.shields.io/badge/docs-risi.q--uestionable.ai-8b5cf6)](https://risi.q-uestionable.ai)
+
 RISI is an agent-operable, human-governed security research harness for studying
 **Retrieval-Induced State Interference** and **Critical Recall Availability Failure** in
 persistent AI-agent memory.
@@ -39,9 +47,24 @@ Capability discovery reserves separate local/lab and remote public-HTTPS inferen
 future, separately approved work. Both remain non-executable: they grant no networking,
 credentials, adapter registration, or model access in the implemented `local-reference` profile.
 
-## Quickstart
+## Install
+
+Install the released command-line harness from PyPI:
 
 ```bash
+pip install risi==0.1.0
+risi --version
+risi capabilities --format json
+```
+
+The distribution provides the RISI library and CLI. The bundled DEP-01 scenario and approval
+files are repository examples, so clone the source tree to run that baseline.
+
+## Run the source example
+
+```bash
+git clone https://github.com/q-uestionable-AI/RISI.git
+cd RISI
 uv sync --locked --group dev
 uv run risi capabilities --format json
 uv run risi validate scenarios/examples/dep-01-local-reference.manifest.json --approval scenarios/examples/dep-01-local-reference.approval.json --scenario-root scenarios
@@ -79,7 +102,7 @@ docstrings. See [CONTRIBUTING.md](CONTRIBUTING.md),
 
 - `docs/` contains public engineering documentation and decision records.
 - `documentation/` contains the source deployed at
-  [risi.mintlify.site](https://risi.mintlify.site).
+  [risi.q-uestionable.ai](https://risi.q-uestionable.ai).
 - `schemas/` contains versioned machine contracts.
 - `scenarios/` contains reviewed synthetic examples.
 - `artifacts/` is excluded from Git and contains local evidence bundles.

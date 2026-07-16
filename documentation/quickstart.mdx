@@ -6,9 +6,21 @@ description: "Run and verify the guarded deterministic DEP-01 baseline"
 ## Prerequisites
 
 - Python 3.11, 3.12, or 3.13
-- [uv](https://docs.astral.sh/uv/)
 
-## Install from source
+## Install the released package
+
+```bash
+pip install risi==0.1.0
+risi --version
+risi capabilities --format json
+```
+
+This installs the RISI library and CLI. The bundled DEP-01 scenario and approval files are source
+examples and are not included in the wheel.
+
+## Prepare the source example
+
+Running DEP-01 also requires Git and [uv](https://docs.astral.sh/uv/).
 
 ```bash
 git clone https://github.com/q-uestionable-AI/RISI.git

@@ -25,6 +25,14 @@ def test_version_command() -> None:
     assert result.stdout.strip() == __version__
 
 
+def test_root_version_option() -> None:
+    for option in ("--version", "-V"):
+        result = runner.invoke(app, [option])
+
+        assert result.exit_code == 0
+        assert result.stdout.strip() == __version__
+
+
 def test_smoke_command() -> None:
     result = runner.invoke(app, ["smoke"])
 
