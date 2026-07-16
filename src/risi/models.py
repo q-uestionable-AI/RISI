@@ -247,6 +247,15 @@ class RetrievalQuery:
         if self.top_k <= 0:
             raise ValueError("top_k must be positive")
 
+    def to_json(self) -> dict[str, JsonValue]:
+        """Return the JSON-compatible retrieval-query representation."""
+        return {
+            "principal_id": self.principal_id,
+            "tenant_id": self.tenant_id,
+            "text": self.text,
+            "top_k": self.top_k,
+        }
+
 
 @dataclass(frozen=True, slots=True)
 class RetrievalHit:
@@ -270,6 +279,10 @@ class RetrievalHit:
         if not math.isfinite(self.score):
             raise ValueError("score must be finite")
 
+    def to_json(self) -> dict[str, JsonValue]:
+        """Return the JSON-compatible retrieval-hit representation."""
+        return {"memory_id": self.memory_id, "rank": self.rank, "score": self.score}
+
 
 @dataclass(frozen=True, slots=True)
 class RetrievalResult:
@@ -291,6 +304,13 @@ class RetrievalResult:
             raise ValueError("retrieval hit ranks must be contiguous and one-based")
         _require_unique(tuple(hit.memory_id for hit in self.hits), "retrieval hit memory IDs")
         object.__setattr__(self, "observations", freeze_json_object(self.observations))
+
+    def to_json(self) -> dict[str, JsonValue]:
+        """Return the JSON-compatible retrieval-result representation."""
+        return {
+            "hits": [hit.to_json() for hit in self.hits],
+            "observations": normalize_json_object(self.observations),
+        }
 
 
 @dataclass(frozen=True, slots=True)

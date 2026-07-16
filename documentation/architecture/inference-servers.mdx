@@ -1,0 +1,35 @@
+---
+title: "Standalone Inference Servers"
+description: "How local or lab inference servers fit without becoming the primary harness"
+---
+
+## Two integration roles
+
+A standalone inference server can provide decisions through the `DecisionProvider` boundary. In
+that role it receives exact target-visible context and returns only a structured synthetic
+proposal.
+
+A server exposing persistent memory or retrieval can implement `MemoryAdapter`. In that role the
+server itself can become the authorized RISI or CRAF target, while evaluator snapshots and oracles
+remain outside its target-visible interface.
+
+## Reserved safety profile
+
+`risi capabilities` reports `authorized-local-inference` as reserved and not implemented. It will
+not be accepted until its controls are implemented and approved. Those controls include:
+
+- an exact endpoint and model allowlist;
+- strict request, response, time, and retry budgets;
+- redirect and unexpected-origin rejection;
+- explicit credential policy;
+- deterministic request and response evidence;
+- operator approval bound to the endpoint configuration.
+
+Application checks cannot guarantee process-level egress isolation. Local or lab inference testing
+must also use suitable host, container, firewall, or VLAN controls.
+
+## Optional agent integrations
+
+An MCP server, skill, or plugin may later expose the standalone harness to an agent ecosystem. Such
+an integration must call the same application service and cannot register providers, weaken
+budgets, grant capabilities, or bypass evidence generation.

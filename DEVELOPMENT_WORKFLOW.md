@@ -16,7 +16,15 @@ RISI follows a release-aligned workflow:
 - `docs/*` — optional documentation-only work.
 - `chore/*` — optional maintenance work.
 
-Branch from `main`, keep the scope focused, and merge only when the work is ready for release.
+Branch from `main`, keep the scope coherent with the approved outcome, and merge only when the work
+is ready for release.
+
+## Agent-operable changes
+
+Autonomous operation does not create separate authority. New CLI, MCP, skill, plugin, or API
+surfaces must call the same application service and safety kernel, preserve stable result and error
+contracts, and produce auditable evidence. A model-selected endpoint or manifest field must never
+be treated as a policy grant.
 
 ## Research change control
 

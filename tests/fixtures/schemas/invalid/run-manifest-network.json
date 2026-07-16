@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "run_id": "network-request",
+  "profile": "local-reference",
+  "scenario_path": "examples/dep-01-pure-read.json",
+  "scenario_sha256": "789cfabd8f423a3a7393668a45b1e641e02398f058ab37f375cbaa80e5bee2a3",
+  "seed": 17,
+  "adapter": "reference",
+  "decision_provider": "deterministic-approval",
+  "policy": "pure-read",
+  "capabilities": ["network.connect"],
+  "limits": {
+    "episodes": 1,
+    "retrieval_calls": 1,
+    "logical_steps": 1,
+    "input_bytes": 1000,
+    "memory_records": 10,
+    "artifact_bytes": 1000
+  }
+}

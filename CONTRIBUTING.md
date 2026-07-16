@@ -11,8 +11,8 @@ uv run pre-commit install
 
 ## Branch workflow
 
-Do not develop directly on `main`. Create a focused `feature/*` or `fix/*` branch, verify the
-change, and keep it on that branch until it is release-ready.
+Do not develop directly on `main`. Create a coherent `feature/*` or `fix/*` branch, verify the
+complete approved outcome, and keep it on that branch until it is release-ready.
 
 ## Before committing
 
@@ -37,6 +37,8 @@ uv run risi --help
 - 100-character line length.
 - Synthetic, deterministic fixtures only.
 - No credentials, private charter content, or research evidence in the repository.
+- Stable JSON contracts for operations intended to be invoked autonomously.
+- Identical safety authorization below every human-facing or agent-facing interface.
 
 ## Research claims
 

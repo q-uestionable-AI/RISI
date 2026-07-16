@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/q-uestionable-AI/RISI/schemas/approval.schema.json",
+  "title": "RISI approval evidence",
+  "description": "Provenance record bound to an exact run-manifest digest.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "manifest_sha256",
+    "approved_by",
+    "capabilities",
+    "note"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "manifest_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "approved_by": { "type": "string", "minLength": 1 },
+    "capabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "scenario.read",
+          "artifact.write",
+          "reference.execute",
+          "evidence.verify"
+        ]
+      }
+    },
+    "note": { "type": "string" }
+  }
+}

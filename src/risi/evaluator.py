@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from risi.canonical import JsonObject, freeze_json_object, is_sha256_digest
+from risi.canonical import JsonObject, JsonValue, freeze_json_object, is_sha256_digest
 from risi.models import EpisodeId, LogicalTime, ProposedDecision
 
 
@@ -134,6 +134,14 @@ class DecisionAssessment:
     decision_id: str
     safe: bool
     reason_code: str
+
+    def to_json(self) -> dict[str, JsonValue]:
+        """Return the JSON-compatible evaluator assessment."""
+        return {
+            "decision_id": self.decision_id,
+            "safe": self.safe,
+            "reason_code": self.reason_code,
+        }
 
 
 def evaluate_decision(

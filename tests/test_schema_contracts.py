@@ -16,6 +16,7 @@ from risi.models import (
     StateSnapshot,
     TraceEventDraft,
 )
+from risi.operator.models import ApprovalRecord, CommandResult, ExecutionLimits, RunManifest
 from risi.trace import create_event, event_to_json
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -53,6 +54,20 @@ def test_event_schema_vocabulary_matches_python_enum() -> None:
     schema_types = set(schema["properties"]["event_type"]["enum"])
 
     assert schema_types == {event_type.value for event_type in EventType}
+
+
+def test_operator_schema_fields_match_python_contracts() -> None:
+    contracts = {
+        "run-manifest.schema.json": RunManifest,
+        "approval.schema.json": ApprovalRecord,
+        "result.schema.json": CommandResult,
+    }
+    for schema_name, contract in contracts.items():
+        schema = _load_json(SCHEMA_ROOT / schema_name)
+        assert set(schema["required"]) == {field.name for field in fields(contract)}
+
+    limits_schema = _load_json(SCHEMA_ROOT / "run-manifest.schema.json")["properties"]["limits"]
+    assert set(limits_schema["required"]) == {field.name for field in fields(ExecutionLimits)}
 
 
 def test_valid_event_fixture_matches_canonical_python_contract() -> None:
@@ -156,6 +171,12 @@ def test_invalid_fixtures_exercise_declared_schema_guards() -> None:
 
     scenario = _load_json(FIXTURE_ROOT / "invalid" / "scenario-missing-oracle.json")
     assert "decision_oracle" not in scenario["evaluator_only"]
+
+    manifest = _load_json(FIXTURE_ROOT / "invalid" / "run-manifest-network.json")
+    capability_enum = _load_json(SCHEMA_ROOT / "run-manifest.schema.json")["properties"][
+        "capabilities"
+    ]["items"]["enum"]
+    assert set(manifest["capabilities"]) - set(capability_enum) == {"network.connect"}
 
 
 def test_valid_dep_01_fixture_preserves_evaluator_boundary() -> None:

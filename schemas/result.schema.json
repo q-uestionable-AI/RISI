@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/q-uestionable-AI/RISI/schemas/result.schema.json",
+  "title": "RISI command result envelope",
+  "description": "Stable result and error contract for human and autonomous operators.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "command", "status", "run_id", "data", "errors"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "command": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["ok", "error", "blocked"] },
+    "run_id": { "type": ["string", "null"] },
+    "data": { "$ref": "#/$defs/jsonObject" },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "message", "field"],
+        "properties": {
+          "code": { "type": "string", "minLength": 1 },
+          "message": { "type": "string", "minLength": 1 },
+          "field": { "type": ["string", "null"] }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "jsonObject": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/jsonValue" }
+    },
+    "jsonValue": {
+      "oneOf": [
+        { "type": ["string", "number", "integer", "boolean", "null"] },
+        { "type": "array", "items": { "$ref": "#/$defs/jsonValue" } },
+        { "type": "object", "additionalProperties": { "$ref": "#/$defs/jsonValue" } }
+      ]
+    }
+  }
+}

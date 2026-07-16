@@ -15,6 +15,8 @@ must never be copied into this repository.
 - Do not commit or push unless the user explicitly asks.
 - Do not add dependencies without explicit approval.
 - Keep research evidence, unpublished traces, findings, and publication drafts outside this repo.
+- Build the complete, coherent, proportionate solution needed for the approved outcome. Do not
+  reduce correctness, safety, verification, or documentation merely to minimize a change set.
 
 ## Research boundaries
 
@@ -25,6 +27,10 @@ must never be copied into this repository.
 - Treat CAAF as exploratory and separate from core CRAF.
 - Do not describe hypotheses or proposed terminology as validated findings.
 - Keep evaluator-only truth, criticality, and applicability oracles outside target-visible state.
+- Treat every model, including an orchestrating model, as an untrusted caller.
+- Route every state-changing interface through the same model-independent safety kernel. CLI,
+  MCP, skill, plugin, or other wrappers must not create alternate authority paths.
+- Manifests may request capabilities but must never define their own grants or safety ceilings.
 
 ## Technical stack
 

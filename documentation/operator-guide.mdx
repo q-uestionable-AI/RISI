@@ -1,0 +1,46 @@
+---
+title: "Operator Guide"
+description: "Machine contracts, safety decisions, exit codes, and evidence handling"
+---
+
+## One interface for humans and agents
+
+Every operational command supports `--format json`. The envelope always includes a schema version,
+command, status, optional run identifier, structured data, and structured errors. Human-readable
+output calls the same application service and safety kernel.
+
+## Contracts
+
+A run manifest declares an exact scenario path and digest, seed, adapter, decision provider,
+policy, capability request, and resource limits. It cannot define grants or increase the built-in
+profile ceilings.
+
+Approval evidence contains the exact manifest SHA-256, reviewer identity, and approved capability
+scope. It provides provenance and change detection, not authentication. Protect or sign it outside
+an agent's writable context when a stronger boundary is required.
+
+## Stable exit codes
+
+| Code | Meaning |
+| --- | --- |
+| `0` | Success |
+| `2` | Invalid input or contract |
+| `3` | Blocked by safety policy |
+| `4` | Evidence or replay integrity failure |
+| `5` | Execution or artifact failure |
+
+## Evidence bundle
+
+Each completed run contains the approved manifest, approval evidence, separated target and
+evaluator scenario views, initial and final snapshots, canonical events, retrieval and context,
+decision proposal, evaluator assessment, execution summary, and report.
+
+`inventory.json` records the path, size, and SHA-256 of every file. Retain the inventory SHA-256
+reported by `risi run` outside the bundle when an independent integrity anchor is needed.
+
+## Autonomous operation
+
+An agent may inspect capabilities, prepare a manifest, validate an approved run, execute it, verify
+and replay its evidence, and propose an interpretation. Human review remains responsible for scope,
+authorization, release, and research claims. Model prose is never a substitute for the evidence
+bundle or deterministic checks.

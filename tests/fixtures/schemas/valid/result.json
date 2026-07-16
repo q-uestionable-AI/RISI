@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "command": "validate",
+  "status": "ok",
+  "run_id": "dep-01-local-reference",
+  "data": {"authorized": true},
+  "errors": []
+}
