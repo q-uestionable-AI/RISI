@@ -4,5 +4,11 @@
 requests the complete `local-reference` capability set and bounded resources. The example approval
 is bound to that exact manifest digest.
 
+`dep-01-craf.json` adds one authorized truthful close-distractor interaction and a target-visible
+protected-recall label. Its `craf-reference` manifest executes pure-read control,
+memory-eclipsing treatment, and protected-critical-recall treatment arms from the same initial
+snapshot. The intentionally vulnerable policy is a synthetic reference mechanism, not an external
+attack or vulnerability finding.
+
 The approval demonstrates provenance and change detection for a synthetic repository example. It
 is not authentication and must not be copied as authorization for another scenario or environment.

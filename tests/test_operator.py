@@ -27,12 +27,42 @@ def _approval() -> ApprovalRecord:
     return load_approval_record(EXAMPLES / "dep-01-local-reference.approval.json")
 
 
+def _craf_manifest() -> RunManifest:
+    from risi.operator.models import load_run_manifest
+
+    return load_run_manifest(EXAMPLES / "dep-01-craf-reference.manifest.json")
+
+
+def _craf_approval() -> ApprovalRecord:
+    from risi.operator.models import load_approval_record
+
+    return load_approval_record(EXAMPLES / "dep-01-craf-reference.approval.json")
+
+
 def test_example_approval_is_bound_to_canonical_manifest() -> None:
     manifest = _manifest()
     approval = _approval()
 
     assert manifest.digest == approval.manifest_sha256
     assert authorize_run(manifest, approval).allowed
+
+
+def test_craf_example_uses_a_separate_closed_policy_and_exact_limits() -> None:
+    manifest = _craf_manifest()
+    approval = _craf_approval()
+
+    decision = authorize_run(manifest, approval)
+
+    assert decision.allowed
+    assert manifest.policy == "craf-reference"
+    assert manifest.limits.episodes == 3
+    assert manifest.limits.retrieval_calls == 6
+
+    changed = replace(manifest, policy="unknown-policy")
+    changed_approval = replace(approval, manifest_sha256=changed.digest)
+    denied = authorize_run(changed, changed_approval)
+    assert not denied.allowed
+    assert "memory_policy_denied" in denied.reason_codes
 
 
 def test_manifest_cannot_self_grant_or_exceed_profile_limits() -> None:

@@ -76,22 +76,35 @@ def _render_text(result: CommandResult) -> str:
     elif result.command == "validate":
         rendered = f"{result.run_id}: valid and authorized"
     elif result.command == "run":
-        rendered = (
-            f"{result.run_id}: completed safely={result.data['safe']}\n"
-            f"evidence: {result.data['bundle_path']}\n"
-            f"inventory sha256: {result.data['inventory_sha256']}"
-        )
+        if "comparison_result" in result.data:
+            rendered = (
+                f"{result.run_id}: completed {result.data['comparison_result']}\n"
+                f"evidence: {result.data['bundle_path']}\n"
+                f"inventory sha256: {result.data['inventory_sha256']}"
+            )
+        else:
+            rendered = (
+                f"{result.run_id}: completed safely={result.data['safe']}\n"
+                f"evidence: {result.data['bundle_path']}\n"
+                f"inventory sha256: {result.data['inventory_sha256']}"
+            )
     elif result.command == "verify":
         rendered = (
             f"{result.run_id}: evidence verified\n"
             f"inventory sha256: {result.data['inventory_sha256']}"
         )
     elif result.command == "replay":
-        rendered = (
-            f"{result.run_id}: replay verified ({result.data['event_count']} events)\n"
-            f"decision: {result.data['decision_action']}\n"
-            f"safe: {result.data['safe']}"
-        )
+        if "comparison_result" in result.data:
+            rendered = (
+                f"{result.run_id}: replay verified ({result.data['event_count']} events)\n"
+                f"comparison: {result.data['comparison_result']}"
+            )
+        else:
+            rendered = (
+                f"{result.run_id}: replay verified ({result.data['event_count']} events)\n"
+                f"decision: {result.data['decision_action']}\n"
+                f"safe: {result.data['safe']}"
+            )
     else:
         rendered = canonical_json(result.to_json())
     return rendered
@@ -259,7 +272,7 @@ def replay_command(
     bundle_path: Path = typer.Argument(..., help="Evidence-bundle directory."),
     format_name: str = typer.Option("text", "--format", help="Output format: text or json."),
 ) -> None:
-    """Perform model-free replay of a verified pure-read evidence bundle."""
+    """Perform model-free replay of a verified deterministic evidence bundle."""
     try:
         _validate_format(format_name)
         replay = replay_bundle(bundle_path)

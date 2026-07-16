@@ -105,27 +105,59 @@ LOCAL_REFERENCE_POLICY = SafetyPolicy(
     ),
 )
 
+CRAF_REFERENCE_POLICY = SafetyPolicy(
+    profile=ExecutionProfile.LOCAL_REFERENCE,
+    capabilities=LOCAL_REFERENCE_POLICY.capabilities,
+    adapter="reference",
+    decision_provider="deterministic-approval",
+    policy="craf-reference",
+    ceilings=ExecutionLimits(
+        episodes=3,
+        retrieval_calls=6,
+        logical_steps=100,
+        input_bytes=1_000_000,
+        memory_records=1_000,
+        artifact_bytes=20_000_000,
+    ),
+)
+
+
+def safety_policy_for_manifest(manifest: RunManifest) -> SafetyPolicy:
+    """Select a closed built-in policy for an operator manifest.
+
+    Args:
+        manifest: Requested run contract.
+
+    Returns:
+        Exact immutable safety policy. Unknown policies fall back to the pure-read policy and are
+        denied by the normal contract comparison.
+    """
+    if manifest.policy == CRAF_REFERENCE_POLICY.policy:
+        return CRAF_REFERENCE_POLICY
+    return LOCAL_REFERENCE_POLICY
+
 
 def authorize_run(
     manifest: RunManifest,
     approval: ApprovalRecord | None,
-    policy: SafetyPolicy = LOCAL_REFERENCE_POLICY,
+    policy: SafetyPolicy | None = None,
 ) -> AuthorizationDecision:
     """Authorize an exact manifest under a non-agent-controlled policy.
 
     Args:
         manifest: Requested run contract.
         approval: Hash-bound approval evidence, if supplied.
-        policy: Immutable execution policy selected by trusted application code.
+        policy: Optional immutable policy override selected by trusted application code.
 
     Returns:
         Complete authorization decision with stable reason codes.
     """
+    selected_policy = policy or safety_policy_for_manifest(manifest)
     requested = set(manifest.capabilities)
-    reasons = _contract_reasons(manifest, policy, requested)
-    reasons.extend(_limit_reasons(manifest.limits, policy.ceilings))
+    reasons = _contract_reasons(manifest, selected_policy, requested)
+    reasons.extend(_limit_reasons(manifest.limits, selected_policy.ceilings))
     reasons.extend(_approval_reasons(manifest, approval, requested))
-    granted = tuple(sorted(requested & policy.capabilities, key=lambda item: item.value))
+    granted = tuple(sorted(requested & selected_policy.capabilities, key=lambda item: item.value))
     return AuthorizationDecision(not reasons, tuple(reasons), granted)
 
 

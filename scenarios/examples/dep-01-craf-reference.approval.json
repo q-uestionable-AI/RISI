@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "manifest_sha256": "af3a44e4e6fa1f5475a3caa564a591a0f5ef54bb2601d71aea7937f1e3704cc1",
+  "approved_by": "example-operator",
+  "capabilities": [
+    "scenario.read",
+    "artifact.write",
+    "reference.execute",
+    "evidence.verify"
+  ],
+  "note": "Repository example for the synthetic DEP-01 controlled CRAF comparison."
+}

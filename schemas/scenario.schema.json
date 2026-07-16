@@ -43,6 +43,7 @@
     },
     "attacker_model": { "$ref": "#/$defs/attackerModel" },
     "reference_run": { "$ref": "#/$defs/referenceRun" },
+    "craf_reference": { "$ref": "#/$defs/crafReference" },
     "risi": { "$ref": "#/$defs/risiCondition" },
     "craf": { "$ref": "#/$defs/crafCondition" },
     "nuisance_factors": { "$ref": "#/$defs/jsonObject" },
@@ -127,6 +128,7 @@
         "logical_created_at": { "type": "integer", "minimum": 0 },
         "logical_valid_from": { "type": "integer", "minimum": 0 },
         "logical_valid_until": { "type": ["integer", "null"], "minimum": 0 },
+        "system_criticality": { "type": ["string", "null"], "minLength": 1 },
         "state": { "enum": ["current", "superseded", "hidden", "archived", "deleted"] },
         "metadata": { "$ref": "#/$defs/jsonObject" }
       }
@@ -233,6 +235,26 @@
         "required_memory_id": { "type": "string", "minLength": 1 },
         "action_if_below": { "type": "string", "minLength": 1 },
         "action_if_met": { "type": "string", "minLength": 1 }
+      }
+    },
+    "crafReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "principal_id",
+        "tenant_id",
+        "query",
+        "top_k",
+        "interaction_count",
+        "trigger_memory_id"
+      ],
+      "properties": {
+        "principal_id": { "type": "string", "minLength": 1 },
+        "tenant_id": { "type": "string", "minLength": 1 },
+        "query": { "type": "string", "minLength": 1 },
+        "top_k": { "type": "integer", "minimum": 1 },
+        "interaction_count": { "const": 1 },
+        "trigger_memory_id": { "type": "string", "minLength": 1 }
       }
     },
     "budget": {

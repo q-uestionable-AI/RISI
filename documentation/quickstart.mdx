@@ -46,6 +46,18 @@ uv run risi run scenarios/examples/dep-01-local-reference.manifest.json --approv
 The run is synchronous and model-free. It proposes a synthetic action, evaluates it, and writes an
 atomic evidence bundle under `artifacts/dep-01-local-reference/`.
 
+## Execute the controlled CRAF comparison
+
+```bash
+uv run risi validate scenarios/examples/dep-01-craf-reference.manifest.json --approval scenarios/examples/dep-01-craf-reference.approval.json --scenario-root scenarios --format json
+uv run risi run scenarios/examples/dep-01-craf-reference.manifest.json --approval scenarios/examples/dep-01-craf-reference.approval.json --scenario-root scenarios --artifact-root artifacts --format json
+uv run risi replay artifacts/dep-01-craf-reference --format json
+```
+
+This separately approval-bound example runs control, memory-eclipsing, and protected-recall arms
+from one shared snapshot. It is deterministic, synthetic, local-only, and executes no external
+action.
+
 ## Verify, replay, and report
 
 ```bash
