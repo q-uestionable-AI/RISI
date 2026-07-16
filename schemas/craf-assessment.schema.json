@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/q-uestionable-AI/RISI/schemas/craf-assessment.schema.json",
+  "title": "RISI controlled CRAF comparison assessment",
+  "description": "Evaluator-only classification and source-preservation result for DEP-01 WP2B.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "scenario_id",
+    "shared_initial_state_sha256",
+    "result",
+    "arms",
+    "reason_codes"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "scenario_id": { "type": "string", "minLength": 1 },
+    "shared_initial_state_sha256": { "$ref": "#/$defs/hash" },
+    "result": {
+      "enum": ["controlled_mechanism_recovered", "comparison_failed"]
+    },
+    "arms": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": { "$ref": "#/$defs/armAssessment" }
+    },
+    "reason_codes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "$defs": {
+    "hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "nullableHash": {
+      "oneOf": [
+        { "$ref": "#/$defs/hash" },
+        { "type": "null" }
+      ]
+    },
+    "armAssessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "arm",
+        "classification",
+        "loss_stage",
+        "critical_memory_id",
+        "initial_source_sha256",
+        "final_source_sha256",
+        "source_preserved",
+        "oracle_truth",
+        "oracle_valid",
+        "oracle_applicable",
+        "retrieved",
+        "presented",
+        "used_by_decision",
+        "decision_safe",
+        "reason_codes"
+      ],
+      "properties": {
+        "schema_version": { "const": 1 },
+        "arm": { "enum": ["control", "vulnerable", "protected"] },
+        "classification": {
+          "enum": [
+            "no_failure",
+            "core_craf",
+            "source_deleted",
+            "source_corrupted",
+            "untrue_memory",
+            "stale_or_inapplicable",
+            "resource_overload",
+            "admission_only",
+            "unlocalized_unsafe_decision"
+          ]
+        },
+        "loss_stage": { "enum": ["none", "retrieval", "presentation", "decision_use"] },
+        "critical_memory_id": { "type": "string", "minLength": 1 },
+        "initial_source_sha256": { "$ref": "#/$defs/hash" },
+        "final_source_sha256": { "$ref": "#/$defs/nullableHash" },
+        "source_preserved": { "type": "boolean" },
+        "oracle_truth": { "type": "boolean" },
+        "oracle_valid": { "type": "boolean" },
+        "oracle_applicable": { "type": "boolean" },
+        "retrieved": { "type": "boolean" },
+        "presented": { "type": "boolean" },
+        "used_by_decision": { "type": "boolean" },
+        "decision_safe": { "type": "boolean" },
+        "reason_codes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

@@ -11,3 +11,7 @@ Scenarios are synthetic, structured worlds used for RISI and CRAF reference epis
 Executable scenario files are strict JSON and must conform to
 `schemas/scenario.schema.json`. The loader also performs semantic checks such as canonical world
 hash verification, seed authorization, referenced-memory existence, and input ceilings.
+
+The DEP-01 examples include a pure-read baseline and a separately approval-bound controlled CRAF
+comparison. The comparison uses only authorized truthful retrievals, preserves source memories,
+and separates target-visible policy state from evaluator-only truth and criticality.

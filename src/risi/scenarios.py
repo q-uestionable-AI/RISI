@@ -56,6 +56,38 @@ class ReferenceRunProtocol:
 
 
 @dataclass(frozen=True, slots=True)
+class CrafReferenceProtocol:
+    """Describe the target-visible truthful interaction used in WP2B.
+
+    Attributes:
+        principal_id: Authorized principal issuing the interaction retrieval.
+        tenant_id: Tenant authorization boundary for the interaction.
+        query: Truthful synthetic query that retrieves the designated trigger memory.
+        top_k: Maximum interaction retrieval results.
+        interaction_count: Exact bounded number of interactions.
+        trigger_memory_id: Truthful close distractor that activates adaptive state.
+    """
+
+    principal_id: str
+    tenant_id: str
+    query: str
+    top_k: int
+    interaction_count: int
+    trigger_memory_id: str
+
+    def to_json(self) -> dict[str, JsonValue]:
+        """Return the JSON-compatible interaction protocol."""
+        return {
+            "principal_id": self.principal_id,
+            "tenant_id": self.tenant_id,
+            "query": self.query,
+            "top_k": self.top_k,
+            "interaction_count": self.interaction_count,
+            "trigger_memory_id": self.trigger_memory_id,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class SyntheticScenario:
     """Contain separated target-visible and evaluator-only scenario state.
 
@@ -67,6 +99,7 @@ class SyntheticScenario:
         memories: Target-visible memory records.
         evaluator: Evaluator-only truth and decision oracles.
         protocol: Target-visible reference-run protocol.
+        craf_reference: Optional target-visible controlled CRAF interaction protocol.
         seeds: Allowed deterministic seeds.
     """
 
@@ -77,6 +110,7 @@ class SyntheticScenario:
     memories: tuple[MemoryRecord, ...]
     evaluator: EvaluatorState
     protocol: ReferenceRunProtocol
+    craf_reference: CrafReferenceProtocol | None
     seeds: tuple[int, ...]
 
     def __post_init__(self) -> None:
@@ -87,7 +121,7 @@ class SyntheticScenario:
 
     def target_view(self) -> dict[str, JsonValue]:
         """Return only state that may be exposed to the target implementation."""
-        return {
+        target: dict[str, JsonValue] = {
             "schema_version": self.schema_version,
             "scenario_id": self.scenario_id,
             "logical_time": self.logical_time,
@@ -96,6 +130,9 @@ class SyntheticScenario:
             "reference_run": self.protocol.to_json(),
             "seeds": list(self.seeds),
         }
+        if self.craf_reference is not None:
+            target["craf_reference"] = self.craf_reference.to_json()
+        return target
 
     def evaluator_view(self) -> dict[str, JsonValue]:
         """Return evaluator-only material for evidence capture."""
@@ -145,9 +182,15 @@ def _require_integer(value: Any, field_name: str) -> int:
     return cast(int, value)
 
 
-def _exact_keys(value: dict[str, Any], required: set[str], field_name: str) -> None:
+def _exact_keys(
+    value: dict[str, Any],
+    required: set[str],
+    field_name: str,
+    optional: set[str] | None = None,
+) -> None:
+    allowed = required | (optional or set())
     missing = required - set(value)
-    extra = set(value) - required
+    extra = set(value) - allowed
     if missing:
         raise OperatorInputError(f"{field_name} is missing fields: {', '.join(sorted(missing))}")
     if extra:
@@ -170,7 +213,7 @@ def _parse_memory(value: Any, scenario_id: str) -> MemoryRecord:
         "state",
         "metadata",
     }
-    _exact_keys(memory, required, "initial_memories item")
+    _exact_keys(memory, required, "initial_memories item", {"system_criticality"})
     access_policy = tuple(
         _require_string(item, "access_policy item")
         for item in _require_array(memory["access_policy"], "access_policy")
@@ -178,6 +221,9 @@ def _parse_memory(value: Any, scenario_id: str) -> MemoryRecord:
     valid_until = memory["logical_valid_until"]
     if valid_until is not None:
         valid_until = _require_integer(valid_until, "logical_valid_until")
+    system_criticality = memory.get("system_criticality")
+    if system_criticality is not None:
+        system_criticality = _require_string(system_criticality, "system_criticality")
     try:
         state = MemoryState(_require_string(memory["state"], "state"))
     except ValueError as exc:
@@ -193,6 +239,7 @@ def _parse_memory(value: Any, scenario_id: str) -> MemoryRecord:
         logical_created_at=_require_integer(memory["logical_created_at"], "logical_created_at"),
         logical_valid_from=_require_integer(memory["logical_valid_from"], "logical_valid_from"),
         logical_valid_until=valid_until,
+        system_criticality=system_criticality,
         state=state,
         metadata=_require_object(memory["metadata"], "metadata"),
     )
@@ -225,6 +272,36 @@ def _parse_protocol(value: Any) -> ReferenceRunProtocol:
     )
     if parsed.top_k <= 0 or parsed.minimum_approvals <= 0:
         raise OperatorInputError("reference_run numeric limits must be positive")
+    return parsed
+
+
+def _parse_craf_reference(value: Any) -> CrafReferenceProtocol:
+    protocol = _require_object(value, "craf_reference")
+    fields = {
+        "principal_id",
+        "tenant_id",
+        "query",
+        "top_k",
+        "interaction_count",
+        "trigger_memory_id",
+    }
+    _exact_keys(protocol, fields, "craf_reference")
+    parsed = CrafReferenceProtocol(
+        principal_id=_require_string(protocol["principal_id"], "craf_reference.principal_id"),
+        tenant_id=_require_string(protocol["tenant_id"], "craf_reference.tenant_id"),
+        query=_require_string(protocol["query"], "craf_reference.query"),
+        top_k=_require_integer(protocol["top_k"], "craf_reference.top_k"),
+        interaction_count=_require_integer(
+            protocol["interaction_count"], "craf_reference.interaction_count"
+        ),
+        trigger_memory_id=_require_string(
+            protocol["trigger_memory_id"], "craf_reference.trigger_memory_id"
+        ),
+    )
+    if parsed.top_k <= 0:
+        raise OperatorInputError("craf_reference.top_k must be positive")
+    if parsed.interaction_count != 1:
+        raise OperatorInputError("craf_reference.interaction_count must be exactly 1 in M1")
     return parsed
 
 
@@ -307,6 +384,40 @@ def _read_scenario_file(
     return _require_object(raw, "scenario")
 
 
+def _validate_craf_reference(
+    protocol: CrafReferenceProtocol,
+    decision_protocol: ReferenceRunProtocol,
+    memories: tuple[MemoryRecord, ...],
+    evaluator: EvaluatorState,
+    logical_time: int,
+) -> None:
+    trigger = next(
+        (memory for memory in memories if memory.memory_id == protocol.trigger_memory_id),
+        None,
+    )
+    if trigger is None:
+        raise OperatorInputError("craf_reference trigger_memory_id is unknown")
+    if trigger.memory_id == decision_protocol.required_memory_id:
+        raise OperatorInputError("craf_reference trigger must differ from the required memory")
+    if trigger.tenant_id != protocol.tenant_id:
+        raise OperatorInputError("craf_reference trigger belongs to another tenant")
+    if protocol.principal_id not in trigger.access_policy:
+        raise OperatorInputError("craf_reference principal is not authorized for the trigger")
+    currently_available = (
+        trigger.state is MemoryState.CURRENT
+        and logical_time >= trigger.logical_valid_from
+        and (trigger.logical_valid_until is None or logical_time < trigger.logical_valid_until)
+    )
+    if not currently_available:
+        raise OperatorInputError("craf_reference trigger is not currently available")
+    trigger_oracle = next(
+        (oracle for oracle in evaluator.memory_oracles if oracle.memory_id == trigger.memory_id),
+        None,
+    )
+    if trigger_oracle is None or not trigger_oracle.oracle_truth:
+        raise OperatorInputError("craf_reference trigger requires a truthful evaluator oracle")
+
+
 def load_scenario(
     path: Path,
     *,
@@ -349,7 +460,7 @@ def load_scenario(
         "seeds",
         "reference_run",
     }
-    _exact_keys(scenario, required, "scenario")
+    _exact_keys(scenario, required, "scenario", {"craf_reference"})
     schema_version = _require_integer(scenario["schema_version"], "schema_version")
     if schema_version != 1:
         raise OperatorInputError("scenario schema_version must be 1")
@@ -379,6 +490,19 @@ def load_scenario(
         raise OperatorInputError("reference_run requires an unknown world-state fact")
     episode_id = f"{run_id}-episode-0001"
     evaluator = _parse_evaluator(scenario["evaluator_only"], episode_id, memories, world_state)
+    craf_reference = (
+        None
+        if "craf_reference" not in scenario
+        else _parse_craf_reference(scenario["craf_reference"])
+    )
+    if craf_reference is not None:
+        _validate_craf_reference(
+            craf_reference,
+            protocol,
+            memories,
+            evaluator,
+            logical_time,
+        )
     return SyntheticScenario(
         schema_version=schema_version,
         scenario_id=scenario_id,
@@ -387,5 +511,6 @@ def load_scenario(
         memories=memories,
         evaluator=evaluator,
         protocol=protocol,
+        craf_reference=craf_reference,
         seeds=seeds,
     )

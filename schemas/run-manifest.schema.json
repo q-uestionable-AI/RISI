@@ -31,7 +31,7 @@
     "seed": { "type": "integer", "minimum": 0 },
     "adapter": { "const": "reference" },
     "decision_provider": { "const": "deterministic-approval" },
-    "policy": { "const": "pure-read" },
+    "policy": { "enum": ["pure-read", "craf-reference"] },
     "capabilities": {
       "type": "array",
       "minItems": 1,

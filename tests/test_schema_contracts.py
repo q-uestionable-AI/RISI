@@ -4,6 +4,7 @@ from dataclasses import fields
 from pathlib import Path
 
 from risi.canonical import canonical_sha256
+from risi.craf import CrafArm, CrafClassification, CrafComparisonResult, InfluenceLossStage
 from risi.models import (
     EpisodeIdentity,
     EventType,
@@ -54,6 +55,18 @@ def test_event_schema_vocabulary_matches_python_enum() -> None:
     schema_types = set(schema["properties"]["event_type"]["enum"])
 
     assert schema_types == {event_type.value for event_type in EventType}
+
+
+def test_craf_assessment_schema_vocabulary_matches_python_enums() -> None:
+    schema = _load_json(SCHEMA_ROOT / "craf-assessment.schema.json")
+    arm = schema["$defs"]["armAssessment"]["properties"]
+
+    assert set(arm["arm"]["enum"]) == {item.value for item in CrafArm}
+    assert set(arm["classification"]["enum"]) == {item.value for item in CrafClassification}
+    assert set(arm["loss_stage"]["enum"]) == {item.value for item in InfluenceLossStage}
+    assert set(schema["properties"]["result"]["enum"]) == {
+        item.value for item in CrafComparisonResult
+    }
 
 
 def test_operator_schema_fields_match_python_contracts() -> None:

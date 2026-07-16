@@ -32,11 +32,18 @@ an agent's writable context when a stronger boundary is required.
 ## Evidence bundle
 
 Each completed run contains the approved manifest, approval evidence, separated target and
-evaluator scenario views, initial and final snapshots, canonical events, retrieval and context,
-decision proposal, evaluator assessment, execution summary, and report.
+evaluator scenario views, canonical state and events, execution summary, and report. Pure-read
+bundles contain one final state, retrieval, context, decision, and assessment. Controlled CRAF
+bundles contain one shared initial state, per-arm final states and outputs, per-arm evaluator
+assessments, and a comparison assessment.
 
 `inventory.json` records the path, size, and SHA-256 of every file. Retain the inventory SHA-256
 reported by `risi run` outside the bundle when an independent integrity anchor is needed.
+
+The `craf-reference` manifest requests exactly three episodes and six retrieval calls. Its result is
+`controlled_mechanism_recovered` only when the required control, vulnerable, and protected pattern
+passes every evaluator invariant. This is a local synthetic engineering result, not a finding about
+an external system.
 
 ## Autonomous operation
 

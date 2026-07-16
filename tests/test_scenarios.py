@@ -7,6 +7,7 @@ from risi.scenarios import load_scenario
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SCENARIO = PROJECT_ROOT / "scenarios" / "examples" / "dep-01-pure-read.json"
+CRAF_SCENARIO = PROJECT_ROOT / "scenarios" / "examples" / "dep-01-craf.json"
 
 
 def test_dep_01_scenario_loads_with_structural_oracle_separation() -> None:
@@ -34,6 +35,30 @@ def test_scenario_enforces_seed_and_input_budgets() -> None:
             max_input_bytes=100_000,
             max_memory_records=100,
         )
+
+
+def test_craf_scenario_loads_truthful_authorized_interaction_protocol() -> None:
+    scenario = load_scenario(
+        CRAF_SCENARIO,
+        run_id="dep-01-craf-test",
+        seed=17,
+        max_input_bytes=100_000,
+        max_memory_records=100,
+    )
+
+    assert scenario.craf_reference is not None
+    assert scenario.craf_reference.principal_id == "dev-aria"
+    assert scenario.craf_reference.trigger_memory_id == "DEP-CLOSE-01"
+    trigger_oracle = next(
+        item
+        for item in scenario.evaluator.memory_oracles
+        if item.memory_id == scenario.craf_reference.trigger_memory_id
+    )
+    assert trigger_oracle.oracle_truth
+    assert not trigger_oracle.oracle_criticality
+    target = scenario.target_view()
+    assert target["craf_reference"] == scenario.craf_reference.to_json()
+    assert "memory_oracles" not in target
     with pytest.raises(OperatorInputError, match="scenario_sha256"):
         load_scenario(
             SCENARIO,

@@ -27,8 +27,8 @@ Failure (CAAF) remains a separate exploratory admission-stage phenomenon and is 
 
 ## Status
 
-The repository implements a guarded deterministic reference path for the synthetic DEP-01
-pure-read baseline. It includes:
+The repository implements guarded deterministic reference paths for the synthetic DEP-01
+pure-read baseline and a controlled three-arm CRAF comparison. It includes:
 
 - strict run, approval, scenario, result, event, state, and evidence contracts;
 - a model-independent `local-reference` safety profile;
@@ -36,12 +36,18 @@ pure-read baseline. It includes:
   boundary;
 - structurally separated target-visible and evaluator-only state;
 - full-state snapshots and hash-chained event telemetry;
+- an intentionally vulnerable memory-eclipsing policy and a protected-critical-recall control,
+  both limited to the deterministic synthetic reference profile;
+- evaluator-only CRAF classification, source-preservation proof, and retrieval/presentation/
+  decision-use localization;
 - atomic evidence bundles, integrity verification, model-free replay, and generated reports;
 - stable text and JSON CLI output for human or autonomous operation.
 
-It does **not** implement an attack, vulnerable adaptive policy, external inference integration,
-database, consequential action, or external vulnerability finding. The authoritative research
-charter and research evidence remain outside this repository in the private research vault.
+It does **not** implement an external attack, external inference integration, database,
+consequential action, or external vulnerability finding. The controlled vulnerable policy is a
+deliberately synthetic reference mechanism, not evidence about another system. The authoritative
+research charter and research evidence remain outside this repository in the private research
+vault.
 
 Capability discovery reserves separate local/lab and remote public-HTTPS inference profiles for
 future, separately approved work. Both remain non-executable: they grant no networking,
@@ -79,6 +85,20 @@ manifest digest. Approval records provide auditable provenance and change detect
 authentication. Stronger deployments must protect or sign approvals outside an agent's execution
 context.
 
+## Run the controlled CRAF comparison
+
+```bash
+uv run risi validate scenarios/examples/dep-01-craf-reference.manifest.json --approval scenarios/examples/dep-01-craf-reference.approval.json --scenario-root scenarios
+uv run risi run scenarios/examples/dep-01-craf-reference.manifest.json --approval scenarios/examples/dep-01-craf-reference.approval.json --scenario-root scenarios --artifact-root artifacts
+uv run risi replay artifacts/dep-01-craf-reference
+uv run risi report artifacts/dep-01-craf-reference
+```
+
+This run resets control, memory-eclipsing, and protected-critical-recall arms from one canonical
+snapshot. It records a controlled mechanism as recovered only when the control is safe, the
+vulnerable arm produces retrieval-stage core CRAF without changing the critical source, and the
+protected arm remains safe.
+
 ## Safety boundary
 
 RISI uses synthetic scenarios and lab-controlled or explicitly authorized systems only. Decision
@@ -87,8 +107,9 @@ identity, access-control, or other consequential production systems.
 
 All models—including an orchestrating model—are treated as untrusted callers. The safety kernel
 enforces profile, capability, budget, approval, and path controls below the CLI. The implemented
-profile denies network access, subprocesses, credentials, dynamic plugins, and memory writes by
-construction. Host or network isolation remains necessary when future external adapters are used.
+profile denies network access, subprocesses, credentials, dynamic plugins, and source-memory
+writes by construction. Its controlled adaptive policies may change only explicitly recorded
+derived state. Host or network isolation remains necessary when future external adapters are used.
 Any future remote inference profile must bind approval to an exact endpoint, model, non-secret
 credential alias, generation parameters, network class, and request, token, time, retry, and spend
 ceilings while retaining redacted request and response evidence.

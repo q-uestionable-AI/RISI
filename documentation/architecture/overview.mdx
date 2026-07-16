@@ -39,12 +39,28 @@ pre/post state hashes.
 
 ## Model-free replay
 
-Replay verifies the evidence inventory and event chain, reconstructs each pure-read trace step from
-the initial snapshot, and requires the result to equal the recorded final snapshot. It does not ask
-a model to reproduce or judge the prior run.
+Replay verifies the evidence inventory and event chain. It reconstructs pure-read trace steps and
+the closed policy-configuration and memory-eclipsing state transitions, then requires each result
+to equal its recorded final snapshot. For the CRAF comparison it also checks retained retrieval,
+context, decision, evaluator, source-preservation, and localization evidence without invoking a
+model.
+
+## Controlled CRAF comparison
+
+The `craf-reference` policy runs three arms from one canonical initial snapshot. Every arm receives
+the same authorized truthful interaction. The pure-read control leaves adaptive state unchanged;
+the memory-eclipsing policy records a designated derived-state update that suppresses the critical
+memory from later retrieval; and protected critical recall honors a target-visible protection label
+while undergoing the same adaptive update.
+
+Only the evaluator can classify oracle truth, criticality, validity, applicability, source
+preservation, decision safety, and the stage at which influence was lost. Direct deletion,
+corruption, untrue or stale memory, overload, admission-only failure, and unlocalized unsafe
+decisions are excluded from core CRAF.
 
 ## Current boundary
 
-The repository implements the safe DEP-01 pure-read baseline. Adaptive vulnerable policies,
-external adapters, inference servers, attacks, defenses, and statistical claims remain gated
+The repository implements the DEP-01 pure-read baseline and one intentionally controlled synthetic
+CRAF mechanism with a protected control. External adapters, executable inference profiles, live
+targets, autonomous campaigns, and statistical or external vulnerability claims remain gated
 future work.

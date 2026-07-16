@@ -13,14 +13,24 @@ from risi.artifacts import (
     json_lines_bytes,
 )
 from risi.canonical import JsonValue
+from risi.craf import (
+    CrafArm,
+    CrafAssessment,
+    CrafComparisonAssessment,
+    CrafTrialEvidence,
+    assess_craf_comparison,
+    assess_craf_trial,
+)
 from risi.decision import DecisionRequest, DeterministicApprovalProvider
-from risi.evaluator import DecisionAssessment, evaluate_decision
+from risi.evaluator import DecisionAssessment, MemoryOracle, evaluate_decision
 from risi.models import (
     EpisodeIdentity,
     EventType,
     EventVisibility,
+    MemoryRecord,
     PolicyConfiguration,
     PolicyIdentity,
+    ProposedDecision,
     RetrievalQuery,
     RetrievalResult,
     StateSnapshot,
@@ -28,6 +38,7 @@ from risi.models import (
 )
 from risi.operator.models import ApprovalRecord, CommandResult, ResultStatus, RunManifest
 from risi.operator.safety import (
+    CRAF_REFERENCE_POLICY,
     LOCAL_REFERENCE_POLICY,
     AuthorizationDecision,
     authorize_run,
@@ -111,9 +122,29 @@ class _EvidenceMaterial:
     events: tuple[TraceEvent, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class _CrafArmMaterial:
+    arm: CrafArm
+    policy: PolicyConfiguration
+    final_state: StateSnapshot
+    interaction_query: RetrievalQuery
+    interaction_retrieval: RetrievalResult
+    interaction_context: str
+    decision_query: RetrievalQuery
+    decision_retrieval: RetrievalResult
+    decision_context: str
+    decision: ProposedDecision
+    decision_assessment: DecisionAssessment
+    craf_assessment: CrafAssessment
+    events: tuple[TraceEvent, ...]
+
+
 def capabilities_result() -> CommandResult:
     """Return implemented profiles and hard safety boundaries."""
-    profiles: list[JsonValue] = [LOCAL_REFERENCE_POLICY.to_json()]
+    profiles: list[JsonValue] = [
+        LOCAL_REFERENCE_POLICY.to_json(),
+        CRAF_REFERENCE_POLICY.to_json(),
+    ]
     future_profiles: list[JsonValue] = [
         {
             "profile": "authorized-local-inference",
@@ -168,7 +199,17 @@ def validate_run(
         max_memory_records=manifest.limits.memory_records,
         expected_sha256=manifest.scenario_sha256,
     )
-    if scenario.protocol.top_k > manifest.limits.retrieval_calls:
+    if manifest.policy == CRAF_REFERENCE_POLICY.policy:
+        if scenario.craf_reference is None:
+            raise ValueError("craf-reference policy requires a craf_reference protocol")
+        if manifest.limits.episodes < 3:
+            raise ValueError("craf-reference requires an episodes limit of at least 3")
+        required_retrievals = 3 * (scenario.craf_reference.interaction_count + 1)
+        if manifest.limits.retrieval_calls < required_retrievals:
+            raise ValueError("craf-reference retrieval_calls limit is too small")
+    elif scenario.craf_reference is not None:
+        raise ValueError("pure-read policy cannot execute a craf_reference protocol")
+    elif scenario.protocol.top_k > manifest.limits.retrieval_calls:
         raise ValueError("scenario top_k exceeds the approved retrieval_calls limit")
     return ValidatedRun(manifest, approval, authorization, scenario_path, scenario)
 
@@ -204,6 +245,13 @@ def _execute_run(validated: ValidatedRun, artifact_root: Path) -> RunExecution:
     Returns:
         Completed run result and evidence-bundle integrity anchor.
     """
+    if validated.manifest.policy == CRAF_REFERENCE_POLICY.policy:
+        return _execute_craf_reference(validated, artifact_root)
+    return _execute_pure_read(validated, artifact_root)
+
+
+def _execute_pure_read(validated: ValidatedRun, artifact_root: Path) -> RunExecution:
+    """Execute the prevalidated pure-read baseline."""
     manifest = validated.manifest
     scenario = validated.scenario
     resolved_artifact_root = resolve_artifact_root(artifact_root)
@@ -310,6 +358,358 @@ def _execute_run(validated: ValidatedRun, artifact_root: Path) -> RunExecution:
         },
     )
     return RunExecution(result, bundle_path, verification)
+
+
+def _execute_craf_reference(validated: ValidatedRun, artifact_root: Path) -> RunExecution:
+    """Execute the approved three-arm controlled CRAF reference comparison."""
+    manifest = validated.manifest
+    scenario = validated.scenario
+    interaction = scenario.craf_reference
+    if interaction is None:
+        raise AssertionError("validated craf-reference run is missing its interaction protocol")
+    resolved_artifact_root = resolve_artifact_root(artifact_root)
+    episode = EpisodeIdentity(
+        scenario_id=scenario.scenario_id,
+        episode_id=scenario.evaluator.episode_id,
+        seed=manifest.seed,
+    )
+    memory_ids: list[JsonValue] = [memory.memory_id for memory in scenario.memories]
+    memory_ids.sort()
+    initial_state = StateSnapshot(
+        snapshot_version=1,
+        episode=episode,
+        logical_time=scenario.logical_time,
+        next_event_sequence=0,
+        source_memories=scenario.memories,
+        derived_state={},
+        indexes={"memory_ids": memory_ids},
+        queues={"maintenance": []},
+        policy=PolicyConfiguration(
+            PolicyIdentity("pure-read", "1"),
+            {"top_k": scenario.protocol.top_k, "read_side_updates": False},
+        ),
+        policy_state={},
+    )
+    critical_oracle = _critical_oracle(scenario)
+    initial_critical = _memory_by_id(initial_state, critical_oracle.memory_id)
+    if initial_critical.system_criticality != "protected-recall":
+        raise ValueError("craf-reference requires the target-visible protected-recall label")
+
+    adaptive_settings: dict[str, JsonValue] = {
+        "top_k": scenario.protocol.top_k,
+        "read_side_updates": True,
+        "trigger_memory_id": interaction.trigger_memory_id,
+        "suppressed_memory_id": scenario.protocol.required_memory_id,
+    }
+    policies = {
+        CrafArm.CONTROL: PolicyConfiguration(
+            PolicyIdentity("pure-read", "1"),
+            {"top_k": scenario.protocol.top_k, "read_side_updates": False},
+        ),
+        CrafArm.VULNERABLE: PolicyConfiguration(
+            PolicyIdentity("memory-eclipsing", "1"),
+            adaptive_settings,
+        ),
+        CrafArm.PROTECTED: PolicyConfiguration(
+            PolicyIdentity("protected-critical-recall", "1"),
+            {**adaptive_settings, "protected_criticality": "protected-recall"},
+        ),
+    }
+    arms = tuple(
+        _execute_craf_arm(
+            validated,
+            initial_state,
+            arm,
+            policies[arm],
+            critical_oracle,
+            initial_critical,
+        )
+        for arm in CrafArm
+    )
+    comparison = assess_craf_comparison(
+        scenario.scenario_id,
+        state_snapshot_hash(initial_state),
+        tuple(arm.craf_assessment for arm in arms),
+    )
+    files, execution = _craf_evidence_files(validated, initial_state, arms, comparison)
+    verification = create_evidence_bundle(
+        resolved_artifact_root,
+        manifest.run_id,
+        files,
+        max_bytes=manifest.limits.artifact_bytes,
+    )
+    bundle_path = resolved_artifact_root / manifest.run_id
+    result = CommandResult(
+        command="run",
+        status=ResultStatus.OK,
+        run_id=manifest.run_id,
+        data={
+            "scenario_id": scenario.scenario_id,
+            "episode_id": episode.episode_id,
+            "comparison_result": comparison.result.value,
+            "bundle_path": str(bundle_path),
+            "inventory_sha256": verification.inventory_sha256,
+            "bundle_hash": verification.bundle_hash,
+            "event_count": execution["event_count"],
+            "arms": execution["arms"],
+        },
+    )
+    return RunExecution(result, bundle_path, verification)
+
+
+def _execute_craf_arm(
+    validated: ValidatedRun,
+    initial_state: StateSnapshot,
+    arm: CrafArm,
+    policy: PolicyConfiguration,
+    critical_oracle: MemoryOracle,
+    initial_critical: MemoryRecord,
+) -> _CrafArmMaterial:
+    scenario = validated.scenario
+    interaction = scenario.craf_reference
+    if interaction is None:
+        raise AssertionError("craf-reference interaction is required")
+    adapter = ReferenceMemoryAdapter(initial_state)
+    adapter.record_event(
+        EventType.EPISODE_STARTED,
+        EventVisibility.EVALUATOR,
+        {
+            "arm": arm.value,
+            "manifest_sha256": validated.manifest.digest,
+            "profile": validated.manifest.profile.value,
+        },
+    )
+    adapter.configure_policy(policy)
+    interaction_query = RetrievalQuery(
+        principal_id=interaction.principal_id,
+        tenant_id=interaction.tenant_id,
+        text=interaction.query,
+        top_k=interaction.top_k,
+    )
+    interaction_retrieval = adapter.retrieve(interaction_query)
+    interaction_context = adapter.assemble_context(interaction_retrieval)
+    if tuple(hit.memory_id for hit in interaction_retrieval.hits) != (
+        interaction.trigger_memory_id,
+    ):
+        raise ValueError("craf-reference interaction did not isolate its truthful trigger")
+
+    decision_query = RetrievalQuery(
+        principal_id=scenario.protocol.principal_id,
+        tenant_id=scenario.protocol.tenant_id,
+        text=scenario.protocol.query,
+        top_k=scenario.protocol.top_k,
+    )
+    decision_retrieval = adapter.retrieve(decision_query)
+    decision_context = adapter.assemble_context(decision_retrieval)
+    provider = DeterministicApprovalProvider()
+    if provider.provider_id != validated.manifest.decision_provider:
+        raise ValueError("registered decision provider does not match the manifest")
+    decision = provider.propose(
+        DecisionRequest(
+            episode=initial_state.episode,
+            context=decision_context,
+            retrieval=decision_retrieval,
+            facts=scenario.facts,
+            protocol=scenario.protocol,
+        )
+    )
+    adapter.record_event(
+        EventType.DECISION,
+        EventVisibility.BOTH,
+        {"decision": decision.to_json()},
+    )
+    decision_assessment = evaluate_decision(decision, scenario.evaluator.decision_oracle)
+    final_critical = _optional_memory_by_id(adapter.inspect_state(), critical_oracle.memory_id)
+    craf_assessment = assess_craf_trial(
+        CrafTrialEvidence(
+            arm=arm,
+            initial_memory=initial_critical,
+            final_memory=final_critical,
+            oracle=critical_oracle,
+            logical_time=adapter.inspect_state().logical_time,
+            oracle_applicable=_critical_oracle_applicable(scenario, critical_oracle),
+            retrieval_memory_ids=tuple(hit.memory_id for hit in decision_retrieval.hits),
+            context_memory_ids=tuple(hit.memory_id for hit in decision_retrieval.hits),
+            decision=decision,
+            decision_assessment=decision_assessment,
+        )
+    )
+    if craf_assessment.classification.value == "core_craf":
+        adapter.record_event(
+            EventType.CRITICAL_MEMORY_SUPPRESSION,
+            EventVisibility.EVALUATOR,
+            {
+                "assessment": craf_assessment.to_json(),
+                "arm": arm.value,
+            },
+        )
+    adapter.record_event(
+        EventType.ORACLE_EVALUATED,
+        EventVisibility.EVALUATOR,
+        {
+            "decision_assessment": decision_assessment.to_json(),
+            "craf_assessment": craf_assessment.to_json(),
+        },
+    )
+    adapter.record_event(
+        EventType.EPISODE_COMPLETED,
+        EventVisibility.EVALUATOR,
+        {
+            "arm": arm.value,
+            "classification": craf_assessment.classification.value,
+            "safe": decision_assessment.safe,
+        },
+    )
+    final_state = adapter.inspect_state()
+    events = adapter.export_trace()
+    verify_trace(events)
+    return _CrafArmMaterial(
+        arm=arm,
+        policy=policy,
+        final_state=final_state,
+        interaction_query=interaction_query,
+        interaction_retrieval=interaction_retrieval,
+        interaction_context=interaction_context,
+        decision_query=decision_query,
+        decision_retrieval=decision_retrieval,
+        decision_context=decision_context,
+        decision=decision,
+        decision_assessment=decision_assessment,
+        craf_assessment=craf_assessment,
+        events=events,
+    )
+
+
+def _critical_oracle(scenario: SyntheticScenario) -> MemoryOracle:
+    critical = tuple(
+        oracle for oracle in scenario.evaluator.memory_oracles if oracle.oracle_criticality
+    )
+    if len(critical) != 1:
+        raise ValueError("craf-reference requires exactly one evaluator-critical memory")
+    return critical[0]
+
+
+def _critical_oracle_applicable(
+    scenario: SyntheticScenario,
+    oracle: MemoryOracle,
+) -> bool:
+    environment = oracle.applicability.get("environment")
+    minimum_approvals = oracle.applicability.get("minimum_approvals")
+    return (
+        environment == scenario.facts.get("target_environment")
+        and minimum_approvals == scenario.protocol.minimum_approvals
+    )
+
+
+def _optional_memory_by_id(state: StateSnapshot, memory_id: str) -> MemoryRecord | None:
+    return next((memory for memory in state.source_memories if memory.memory_id == memory_id), None)
+
+
+def _memory_by_id(state: StateSnapshot, memory_id: str) -> MemoryRecord:
+    memory = _optional_memory_by_id(state, memory_id)
+    if memory is None:
+        raise ValueError("required source memory is missing")
+    return memory
+
+
+def _craf_evidence_files(
+    validated: ValidatedRun,
+    initial_state: StateSnapshot,
+    arms: tuple[_CrafArmMaterial, ...],
+    comparison: CrafComparisonAssessment,
+) -> tuple[dict[str, bytes], dict[str, JsonValue]]:
+    manifest = validated.manifest
+    arm_summaries: list[JsonValue] = [
+        {
+            "arm": arm.arm.value,
+            "policy": arm.policy.identity.name,
+            "classification": arm.craf_assessment.classification.value,
+            "loss_stage": arm.craf_assessment.loss_stage.value,
+            "safe": arm.decision_assessment.safe,
+            "final_state_hash": state_snapshot_hash(arm.final_state),
+            "event_count": len(arm.events),
+        }
+        for arm in arms
+    ]
+    execution: dict[str, JsonValue] = {
+        "schema_version": 1,
+        "run_id": manifest.run_id,
+        "manifest_sha256": manifest.digest,
+        "episode_id": validated.scenario.evaluator.episode_id,
+        "policy": manifest.policy,
+        "status": "succeeded",
+        "comparison_result": comparison.result.value,
+        "initial_state_hash": state_snapshot_hash(initial_state),
+        "event_count": sum(len(arm.events) for arm in arms),
+        "arms": arm_summaries,
+    }
+    files = {
+        "manifest.json": json_bytes(manifest.to_json()),
+        "approval.json": json_bytes(validated.approval.to_json()),
+        "target-scenario.json": json_bytes(validated.scenario.target_view()),
+        "evaluator/evaluator-state.json": json_bytes(validated.scenario.evaluator_view()),
+        "evaluator/craf-comparison.json": json_bytes(comparison.to_json()),
+        "initial-state.json": json_bytes(initial_state.to_json()),
+        "execution.json": json_bytes(execution),
+    }
+    for arm in arms:
+        prefix = f"arms/{arm.arm.value}"
+        files[f"{prefix}/final-state.json"] = json_bytes(arm.final_state.to_json())
+        files[f"{prefix}/events.jsonl"] = json_lines_bytes(
+            tuple(event_to_json(event) for event in arm.events)
+        )
+        files[f"{prefix}/interaction.json"] = json_bytes(
+            {
+                "query": arm.interaction_query.to_json(),
+                "result": arm.interaction_retrieval.to_json(),
+                "context": arm.interaction_context,
+            }
+        )
+        files[f"{prefix}/retrieval.json"] = json_bytes(
+            {"query": arm.decision_query.to_json(), "result": arm.decision_retrieval.to_json()}
+        )
+        files[f"{prefix}/context.json"] = json_bytes({"context": arm.decision_context})
+        files[f"{prefix}/decision.json"] = json_bytes(arm.decision.to_json())
+        files[f"evaluator/arms/{arm.arm.value}/decision-assessment.json"] = json_bytes(
+            arm.decision_assessment.to_json()
+        )
+        files[f"evaluator/arms/{arm.arm.value}/craf-assessment.json"] = json_bytes(
+            arm.craf_assessment.to_json()
+        )
+    files["report.md"] = _render_craf_report(execution, comparison).encode()
+    return files, execution
+
+
+def _render_craf_report(
+    execution: dict[str, JsonValue],
+    comparison: CrafComparisonAssessment,
+) -> str:
+    lines = [
+        "# RISI controlled CRAF reference report",
+        "",
+        f"- Run: `{execution['run_id']}`",
+        f"- Episode: `{execution['episode_id']}`",
+        f"- Result: **{comparison.result.value}**",
+        f"- Shared initial state: `{comparison.shared_initial_state_sha256}`",
+        f"- Total events: {execution['event_count']}",
+        "",
+        "## Arms",
+        "",
+    ]
+    lines.extend(
+        f"- `{arm.arm.value}`: `{arm.classification.value}` at "
+        f"`{arm.loss_stage.value}`; safe={str(arm.decision_safe).lower()}"
+        for arm in comparison.arms
+    )
+    lines.extend(
+        [
+            "",
+            "This report records an intentionally controlled synthetic mechanism, not an external",
+            "vulnerability finding. No external action was executed.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
 
 
 def _evidence_files(material: _EvidenceMaterial) -> dict[str, bytes]:

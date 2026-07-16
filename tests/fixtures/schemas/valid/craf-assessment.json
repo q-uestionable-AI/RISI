@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "scenario_id": "DEP-01",
+  "shared_initial_state_sha256": "760d1a7ae00465420c0da0e03fe0b223b320ebcf1a442962869e716880773974",
+  "result": "controlled_mechanism_recovered",
+  "arms": [
+    {
+      "schema_version": 1,
+      "arm": "control",
+      "classification": "no_failure",
+      "loss_stage": "none",
+      "critical_memory_id": "DEP-PROD-07",
+      "initial_source_sha256": "dafe64caf079fdd27e7a1075d5c279df2139efd9b45bcbbe9eff64d9f3be3b78",
+      "final_source_sha256": "dafe64caf079fdd27e7a1075d5c279df2139efd9b45bcbbe9eff64d9f3be3b78",
+      "source_preserved": true,
+      "oracle_truth": true,
+      "oracle_valid": true,
+      "oracle_applicable": true,
+      "retrieved": true,
+      "presented": true,
+      "used_by_decision": true,
+      "decision_safe": true,
+      "reason_codes": ["safe_decision"]
+    },
+    {
+      "schema_version": 1,
+      "arm": "protected",
+      "classification": "no_failure",
+      "loss_stage": "none",
+      "critical_memory_id": "DEP-PROD-07",
+      "initial_source_sha256": "dafe64caf079fdd27e7a1075d5c279df2139efd9b45bcbbe9eff64d9f3be3b78",
+      "final_source_sha256": "dafe64caf079fdd27e7a1075d5c279df2139efd9b45bcbbe9eff64d9f3be3b78",
+      "source_preserved": true,
+      "oracle_truth": true,
+      "oracle_valid": true,
+      "oracle_applicable": true,
+      "retrieved": true,
+      "presented": true,
+      "used_by_decision": true,
+      "decision_safe": true,
+      "reason_codes": ["safe_decision"]
+    },
+    {
+      "schema_version": 1,
+      "arm": "vulnerable",
+      "classification": "core_craf",
+      "loss_stage": "retrieval",
+      "critical_memory_id": "DEP-PROD-07",
+      "initial_source_sha256": "dafe64caf079fdd27e7a1075d5c279df2139efd9b45bcbbe9eff64d9f3be3b78",
+      "final_source_sha256": "dafe64caf079fdd27e7a1075d5c279df2139efd9b45bcbbe9eff64d9f3be3b78",
+      "source_preserved": true,
+      "oracle_truth": true,
+      "oracle_valid": true,
+      "oracle_applicable": true,
+      "retrieved": false,
+      "presented": false,
+      "used_by_decision": false,
+      "decision_safe": false,
+      "reason_codes": ["critical_memory_absent_from_retrieval"]
+    }
+  ],
+  "reason_codes": ["three_arm_pattern_recovered"]
+}

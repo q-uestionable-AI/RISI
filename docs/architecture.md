@@ -24,8 +24,9 @@ Integrity verification, model-free replay, and generated report
 ```
 
 The implemented `local-reference` profile statically registers the reference memory adapter,
-deterministic approval provider, and pure-read policy. It denies network access, subprocesses,
-credentials, dynamic plugins, memory writes, and manifest-defined policy grants.
+deterministic approval provider, pure-read baseline, and closed `craf-reference` comparison policy.
+It denies network access, subprocesses, credentials, dynamic plugins, source-memory writes, and
+manifest-defined policy grants.
 
 ## Control plane and data plane
 
@@ -49,7 +50,8 @@ decision provider.
 
 Full-state snapshots cover source memories, derived state, indexes, queues, policy configuration,
 policy state, logical time, and event sequence. The pure-read reference adapter changes only trace
-bookkeeping during the baseline; semantic memory state remains unchanged.
+bookkeeping. The controlled memory-eclipsing and protected policies may change only the explicitly
+recorded derived and policy state; source memories remain unchanged.
 
 ## Evidence and replay
 
@@ -61,9 +63,11 @@ atomically moved into an immutable run directory.
 returns the inventory digest so an operator can retain an independent anchor. Verification rejects
 missing, unlisted, changed, escaping, or symlinked entries.
 
-Replay version 1 is model-free. It verifies the bundle and trace, applies each pure-read trace
-transition to the initial snapshot, and requires the reconstructed state to match the recorded
-final snapshot. Future state-changing policies will require explicit deterministic state patches.
+Replay is model-free. It verifies the bundle and each trace, applies pure-read bookkeeping and the
+closed policy-configuration and memory-eclipsing state transitions to the shared initial snapshot,
+and requires every reconstructed state to match its recorded final snapshot. Controlled CRAF replay
+also cross-checks retained retrieval, context, decision, evaluator, source-preservation, and
+localization evidence.
 
 ## Critical recall decomposition
 
