@@ -30,30 +30,87 @@ These declarations preserve future compatibility without granting network or cre
 Neither profile will be accepted until its controls are implemented, tested, and separately
 approved. Those controls include:
 
-- an immutable target specification covering endpoint origin and base path, model, network class,
-  non-secret credential alias, and generation parameters;
-- strict request, response, token, time, retry, and spend ceilings;
-- DNS and resolved-IP validation plus redirect and unexpected-origin rejection;
-- an explicit credential resolver that never records secret values in configuration or evidence;
-- complete redacted request and response evidence, including failures and timeouts;
-- operator approval bound to the exact target fingerprint and resource envelope.
+- a canonical target specification covering normalized endpoint components, model, network class,
+  non-secret credential alias, generation controls, resource limits, approval identity, and expiry;
+- separate requested target/model, provider-observed, and artifact-proven deployment identities;
+- strict request/response byte, input/output token, deadline, attempt, concurrency, and spend limits;
+- transport, peer-address, redirect, proxy, TLS, credential, data-egress, redaction, evidence, and
+  provider-retention controls;
+- operator approval bound to the exact target identity and complete resource envelope.
 
 ## Hosted inference endpoints
 
-The preferred future integration is a provider-neutral OpenAI-compatible decision adapter, not a
-Runpod-specific control plane. This keeps the same contract usable with Runpod Serverless, an
-authorized Runpod Pod, another hosted provider, or an operator-controlled local server. Provider
-deployment, lifecycle management, billing administration, and arbitrary endpoint discovery remain
-outside the harness.
+The preferred future integration is one narrow controlled OpenAI-compatible `DecisionProvider`,
+not LiteLLM, a general provider framework, a provider SDK, or a Runpod-specific control plane.
+Provider deployment, lifecycle management, billing administration, arbitrary endpoint discovery,
+and provider-specific orchestration remain outside the harness unless a later approved package
+demonstrates the need.
+
+Runpod is a generic example of an authorized OpenAI-compatible endpoint. Protocol-shape tests do
+not establish live Runpod compatibility. A compatibility claim requires a separately approved
+exact target, credential, cost, outbound-data, evidence, and stop-policy run.
+
+## Canonical target and identity
+
+A future target contract binds normalized scheme, host, port, origin, and base path; requested
+model; non-secret credential alias; generation controls; serialized request and response byte
+ceilings; input and output token ceilings; connect, read, write, pool, and overall deadlines;
+rounds, requests, attempts, retries, concurrency, spend basis and ceiling; outbound-data class;
+human approval identity; and approval expiry.
+
+Requested target/model identity, provider-reported observed identity, and artifact-proven deployment
+identity are distinct. A model string or mutable alias is not proof of the deployed model or image.
+Evidence and reports must state weaker reproducibility when immutable provenance is unavailable.
+
+## Network and endpoint enforcement
+
+Public endpoints require HTTPS and a canonical hostname. Authorized local HTTP is loopback-only.
+Endpoint URLs reject user information, query strings, fragments, malformed ports, ambiguous hosts,
+and unsafe IP literals.
+
+Public resolution must use deterministic injectable A and AAAA handling, reject non-global or mixed
+address sets, and pin the approved address at connection time or verify the connected peer address.
+Normal TLS hostname and certificate verification remains enabled. Redirects and environment-proxy
+inheritance are disabled, unexpected origins fail closed, and no unapproved proxy route is allowed.
+Host, container, firewall, or VLAN egress policy remains necessary because application checks alone
+cannot guarantee isolation.
+
+## Deadlines, evidence, secrets, and cost
+
+Remote execution requires explicit connect, read, write, pool, and overall deadlines; zero retries
+by default; bounded attempts; observable cancellation; and fail-closed parsing of every untrusted
+provider response. Serialized byte ceilings are independent of token limits. Evidence distinguishes
+a client timeout or cancellation request from confirmed provider-side cancellation: a client
+timeout does not prove provider computation or billing stopped.
+
+Only a non-secret credential alias enters the target contract. Secret values resolve from an
+approved operator-controlled secret provider and never enter configurations, manifests, logs,
+evidence, exceptions, model context, or reports. Structured logging, recursive redaction, sanitized
+provider errors, and negative tests for echoed or embedded secrets are mandatory.
+
+Approval classifies every outbound data category, including prompts, candidate decisions, traces,
+and experiment material, and records provider retention and privacy terms. Worst-case reservation
+includes prompts, schema overhead, tokens, rounds, attempts, elapsed time, requests, and
+client-enforceable spending. Provider infrastructure lifetime costs that RISI cannot stop or observe
+remain residual or separately operator-bounded costs.
 
 Remote output is captured evidence, not deterministic execution. Model-free replay must verify and
 rescore the retained request and response without contacting the provider; repeating a remote call
 is a new run, not replay.
 
-Application checks cannot guarantee process-level egress isolation. Local or lab inference testing
-must also use suitable host, container, firewall, or VLAN controls. Remote testing additionally
-requires egress restriction to the approved endpoint and connection-time enforcement of the
-approved DNS, IP, TLS, redirect, and origin policy.
+The current synchronous `DecisionProvider.propose` boundary is sufficient for `local-reference` but
+does not decide the future network contract. A post-M1 design must choose an asynchronous provider
+or runner-owned blocking boundary that enforces deadlines, cancellation, cleanup, and elapsed-time
+evidence without using wall-clock time as experimental logic.
+
+## Post-M1 acceptance boundary
+
+An executable inference profile remains blocked until the M1 terminal gate and a separately
+approved implementation package. Deterministic acceptance tests must cover safe public and
+Runpod-shaped endpoints, unsafe literals, private/reserved/mixed resolution, peer mismatch,
+redirects, environment proxies, TLS failures, malformed or oversized responses, secret echoes,
+timeouts, cancellation, retries, budget exhaustion, and authority-bearing identity changes. These
+requirements authorize no client, dependency, credential, cloud call, or live compatibility test.
 
 ## Optional agent integrations
 
