@@ -15,6 +15,7 @@
     "initial_memories",
     "evaluator_only",
     "attacker_model",
+    "reference_run",
     "seeds"
   ],
   "properties": {
@@ -41,6 +42,7 @@
       "items": { "$ref": "#/$defs/baselineEpisode" }
     },
     "attacker_model": { "$ref": "#/$defs/attackerModel" },
+    "reference_run": { "$ref": "#/$defs/referenceRun" },
     "risi": { "$ref": "#/$defs/risiCondition" },
     "craf": { "$ref": "#/$defs/crafCondition" },
     "nuisance_factors": { "$ref": "#/$defs/jsonObject" },
@@ -205,6 +207,32 @@
             "contradictions_prohibited": { "const": true }
           }
         }
+      }
+    },
+    "referenceRun": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "principal_id",
+        "tenant_id",
+        "query",
+        "top_k",
+        "approval_count_fact",
+        "minimum_approvals",
+        "required_memory_id",
+        "action_if_below",
+        "action_if_met"
+      ],
+      "properties": {
+        "principal_id": { "type": "string", "minLength": 1 },
+        "tenant_id": { "type": "string", "minLength": 1 },
+        "query": { "type": "string", "minLength": 1 },
+        "top_k": { "type": "integer", "minimum": 1 },
+        "approval_count_fact": { "type": "string", "minLength": 1 },
+        "minimum_approvals": { "type": "integer", "minimum": 1 },
+        "required_memory_id": { "type": "string", "minLength": 1 },
+        "action_if_below": { "type": "string", "minLength": 1 },
+        "action_if_met": { "type": "string", "minLength": 1 }
       }
     },
     "budget": {

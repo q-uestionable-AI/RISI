@@ -1,41 +1,50 @@
 ---
 title: "Architecture Overview"
-description: "Initial RISI package boundaries and future reference-engine shape"
+description: "Standalone execution, model-independent safety, and evidence-first verification"
 ---
 
-## Scaffold architecture
-
-The initial package establishes a typed adapter boundary, target-visible memory models, scenario and
-event schemas, and a deterministic CLI smoke check. Persistence and experimental behavior are
-deliberately absent.
+## Execution flow
 
 ```text
-Synthetic scenario world
+Human or AI operator
         |
-Trace and budget controller (future)
+Versioned machine contracts
         |
-Memory adapter contract
+Model-independent safety kernel
         |
-Deterministic reference engine (future)
+Deterministic runner
+        +---- MemoryAdapter
+        +---- DecisionProvider
+        +---- Evaluator-only oracle
         |
-Simulated decision layer (future)
+Atomic evidence bundle
         |
-Tamper-evident event and replay pipeline (future)
+Verify, replay, and report
 ```
+
+The `local-reference` profile permits only registered deterministic components. Network access,
+subprocesses, credentials, dynamic plugins, and memory writes are denied.
 
 ## Visibility boundary
 
-Target-visible memory state must never contain evaluator-only truth, criticality, applicability, or
-safe-action oracles. Adapters may expose complete state through `inspect_state`, but only to the
-evaluator.
+Target-visible memory and decision requests never contain evaluator-only truth, criticality,
+applicability, or safe-action oracles. Evidence preserves target and evaluator views in separate
+files. Attacker-visible events reject evaluator-only field names.
 
-## Recall stages
+## Full-state telemetry
 
-Critical recall is decomposed into existence, retrieval, context inclusion, and behavioral
-application. Each stage will be instrumented independently so a model error cannot be mistaken for
-a storage or retrieval failure.
+Snapshots include memories, derived state, indexes, queues, policy configuration and state,
+logical time, and event sequence. Events link their canonical digest to the prior event and record
+pre/post state hashes.
 
-## Current limitations
+## Model-free replay
 
-The reference engine, snapshots, hash chain, replay, truth validator, attacks, defenses, external
-adapters, and statistical analysis are future gated work.
+Replay verifies the evidence inventory and event chain, reconstructs each pure-read trace step from
+the initial snapshot, and requires the result to equal the recorded final snapshot. It does not ask
+a model to reproduce or judge the prior run.
+
+## Current boundary
+
+The repository implements the safe DEP-01 pure-read baseline. Adaptive vulnerable policies,
+external adapters, inference servers, attacks, defenses, and statistical claims remain gated
+future work.

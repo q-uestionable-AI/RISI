@@ -1,6 +1,6 @@
 ---
 title: "Quickstart"
-description: "Install the RISI scaffold and run its deterministic smoke check"
+description: "Run and verify the guarded deterministic DEP-01 baseline"
 ---
 
 ## Prerequisites
@@ -16,24 +16,39 @@ cd RISI
 uv sync --locked --group dev
 ```
 
-## Confirm the CLI
+## Inspect and validate
 
 ```bash
-uv run risi --help
-uv run risi version
-uv run risi smoke
+uv run risi capabilities --format json
+uv run risi validate scenarios/examples/dep-01-local-reference.manifest.json --approval scenarios/examples/dep-01-local-reference.approval.json --scenario-root scenarios --format json
 ```
 
-## Run verification
+Validation reads the scenario but does not execute an episode or create artifacts.
+
+## Execute the safe baseline
 
 ```bash
-uv run ruff check .
-uv run ruff format --check .
-uv run mypy src/risi/
-uv run pytest -q
+uv run risi run scenarios/examples/dep-01-local-reference.manifest.json --approval scenarios/examples/dep-01-local-reference.approval.json --scenario-root scenarios --artifact-root artifacts --format json
+```
+
+The run is synchronous and model-free. It proposes a synthetic action, evaluates it, and writes an
+atomic evidence bundle under `artifacts/dep-01-local-reference/`.
+
+## Verify, replay, and report
+
+```bash
+uv run risi verify artifacts/dep-01-local-reference --format json
+uv run risi replay artifacts/dep-01-local-reference --format json
+uv run risi report artifacts/dep-01-local-reference
 ```
 
 <Note>
-The initial scaffold defines contracts and documentation only. It does not yet implement an attack,
-database, model integration, or experimental evidence pipeline.
+Run identifiers are immutable within an artifact root. Use a fresh artifact root for another run
+of the unchanged example. If the manifest changes, its approval digest must also be reviewed and
+updated.
 </Note>
+
+<Warning>
+The example is synthetic and performs no external action. Do not connect proposed decisions to a
+live deployment or another consequential system.
+</Warning>

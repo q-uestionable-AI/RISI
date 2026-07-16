@@ -23,6 +23,16 @@ deployment, identity, access-control, or other consequential systems.
 Bounded text-only experiments belong on dedicated lab systems. Higher-risk tool or MCP expansions
 require isolated disposable targets and separately reviewed network access.
 
+## Untrusted models and approval evidence
+
+Treat every model, including an orchestrating model, as an untrusted caller. Model-generated
+manifests and tool calls cannot grant authority. Approval JSON binds provenance to a manifest hash
+but is not authentication; stronger deployments must protect or sign it outside the agent's
+writable context.
+
+The harness cannot replace host-level egress enforcement. Use container, firewall, or VLAN controls
+for any future network-capable profile.
+
 ## Responsible disclosure
 
 Reproduce implementation-specific defects from a clean state, prepare a minimal private reproducer
@@ -30,5 +40,5 @@ and mitigation proposal, notify the maintainer privately, and coordinate publica
 
 <Warning>
 Do not publish private research traces, credentials, internal endpoints, or unnecessary
-weaponizable detail.
+weaponizable detail. Retain research evidence in its approved private location.
 </Warning>

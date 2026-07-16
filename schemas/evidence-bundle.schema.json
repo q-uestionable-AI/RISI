@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/q-uestionable-AI/RISI/schemas/evidence-bundle.schema.json",
+  "title": "RISI evidence-bundle inventory",
+  "description": "Content-addressed inventory for an atomic RISI evidence bundle.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run_id", "files", "bundle_hash"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "run_id": { "type": "string", "minLength": 1 },
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256", "bytes"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "bytes": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "bundle_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}

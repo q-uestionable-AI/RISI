@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "risi"
 version = "0.1.0"
-description = "Reference tooling for Retrieval-Induced State Interference research"
+description = "Agent-operable reference harness for Retrieval-Induced State Interference research"
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.11,<3.14"

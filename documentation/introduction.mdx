@@ -1,29 +1,31 @@
 ---
 title: "Introduction"
-description: "Retrieval-induced state interference and critical recall availability research"
+description: "Agent-operable research into retrieval-induced state and critical recall availability"
 ---
 
 ## What is RISI?
 
-RISI is a pre-experimental security research project about persistent AI-agent memory. It studies
-whether authorized retrieval changes adaptive state and whether ordinary, truthful interactions can
-make a legitimate critical memory unavailable at a later decision point.
+RISI is an agent-operable, human-governed security research harness for persistent AI-agent memory.
+It studies whether authorized retrieval changes adaptive state and whether ordinary, truthful
+interactions can make a legitimate critical memory unavailable at a later decision point.
 
-The project is intentionally narrow. It does not treat generic memory poisoning, prompt injection,
-resource exhaustion, or ordinary retrieval degradation as RISI or CRAF.
+The standalone harness is primary. Humans and AI agents use the same versioned contracts, safety
+kernel, evidence pipeline, and verification commands. Ecosystem integrations such as MCP servers or
+skills may be added later as optional wrappers.
 
 ## Research status
 
 RISI, RISI-C, CRAF, and memory eclipsing are proposed terms and hypotheses. They are not validated
-findings. Public claims will remain evidence-labeled and conditional on deterministic controls,
-causal ablations, and external reproduction.
+findings. The repository currently implements a deterministic safe baseline, not an attack or an
+external vulnerability demonstration.
 
 The authoritative research charter is maintained separately in the private research vault. This
 documentation describes released repository behavior and public research boundaries only.
 
 ## Start here
 
-- [Quickstart](/quickstart) — install the scaffold and run the CLI.
+- [Quickstart](/quickstart) — execute and verify the DEP-01 pure-read baseline.
+- [Operator guide](/operator-guide) — understand contracts, exit codes, and evidence.
 - [Core concepts](/concepts) — understand the terminology and boundaries.
 - [Responsible use](/responsible-use) — review authorization and safety requirements.
-- [Architecture](/architecture/overview) — see the initial system contracts.
+- [Architecture](/architecture/overview) — see the enforcement and evidence flow.

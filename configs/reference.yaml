@@ -1,22 +1,26 @@
+# Public reference for the immutable profile implemented in risi.operator.safety.
+# Run manifests request values within these ceilings; this file is not itself an authority source.
 schema_version: 1
-engine:
-  name: reference
-  deterministic: true
-  logical_clock:
-    initial_value: 0
-  random_seed: 0
-policy:
-  retrieval: pure_read
-  capacity: 100
-  top_k: 5
-  read_side_updates: false
-  consolidation: disabled
-  eviction: fifo
-telemetry:
-  hash_chain: true
-  capture_candidates: true
-  capture_context: true
-  separate_attacker_and_evaluator_views: true
-storage:
-  backend: placeholder
-  disposable_per_trial: true
+profile: local-reference
+registered:
+  adapter: reference
+  decision_provider: deterministic-approval
+  memory_policy: pure-read
+capabilities:
+  - scenario.read
+  - artifact.write
+  - reference.execute
+  - evidence.verify
+ceilings:
+  episodes: 1
+  retrieval_calls: 8
+  logical_steps: 100
+  input_bytes: 1000000
+  memory_records: 1000
+  artifact_bytes: 20000000
+denied:
+  network: true
+  subprocesses: true
+  credentials: true
+  dynamic_plugins: true
+  memory_writes: true

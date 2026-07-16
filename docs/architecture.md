@@ -1,32 +1,69 @@
 # Architecture
 
-## Initial boundary
+## System boundary
 
-The scaffold establishes contracts without implementing a database, attack, external adapter, or
-model call.
+RISI is standalone-first. Humans and autonomous agents use the same CLI and application services;
+optional MCP, skill, or plugin wrappers may be added later, but may not introduce another execution
+or authorization path.
 
 ```text
-Synthetic scenario and principals
+Human or AI operator
         |
-Trace runner and budget enforcement (future)
+Versioned manifest, approval, result, and error contracts
         |
-MemoryAdapter contract
+Model-independent safety kernel
         |
-Deterministic reference engine (future M1 work)
+Deterministic experiment runner
+        +---- MemoryAdapter ---- reference or future target memory server
+        +---- DecisionProvider - deterministic or future inference server
+        +---- Evaluator -------- evaluator-only truth and safe-action oracle
         |
-Decision context and simulated decision agent (future)
+Atomic evidence bundle
         |
-Separated attacker-visible and evaluator-only telemetry
+Integrity verification, model-free replay, and generated report
 ```
+
+The implemented `local-reference` profile statically registers the reference memory adapter,
+deterministic approval provider, and pure-read policy. It denies network access, subprocesses,
+credentials, dynamic plugins, memory writes, and manifest-defined policy grants.
+
+## Control plane and data plane
+
+The operator control plane owns authorization:
+
+- a run manifest requests exact components, capabilities, seed, scenario path and digest, and
+  resource limits;
+- approval evidence binds a reviewer identity and capability scope to the manifest digest;
+- immutable application policy decides which requests can be granted;
+- operator-selected scenario and artifact roots constrain filesystem access.
+
+The experimental data plane receives only the granted configuration. A manifest cannot increase a
+ceiling, register a component, choose arbitrary code, or approve itself.
 
 ## State and visibility
 
 Target-visible memory records contain content, provenance, access policy, lifecycle state, and
-adaptive metadata. Oracle criticality, applicability, truth, and safe-action rules belong to the
-evaluator and must never enter retrieval or generation state.
+adaptive metadata. Oracle criticality, applicability, truth, and safe-action rules reside in a
+separate evaluator object and separate evidence files. They are never supplied to retrieval or the
+decision provider.
 
-Snapshots must eventually cover content, adaptive metadata, indexes, caches, logical time,
-maintenance queues, consolidation state, and pending jobs. Content-only snapshots are insufficient.
+Full-state snapshots cover source memories, derived state, indexes, queues, policy configuration,
+policy state, logical time, and event sequence. The pure-read reference adapter changes only trace
+bookkeeping during the baseline; semantic memory state remains unchanged.
+
+## Evidence and replay
+
+Every event has a deterministic sequence, logical time, visibility, pre/post state hashes, previous
+event hash, and canonical event digest. Evidence is first written to a staging directory and then
+atomically moved into an immutable run directory.
+
+`inventory.json` covers every evidence file by path, byte length, and SHA-256 digest. The CLI
+returns the inventory digest so an operator can retain an independent anchor. Verification rejects
+missing, unlisted, changed, escaping, or symlinked entries.
+
+Replay version 1 is model-free. It verifies the bundle and trace, applies each pure-read trace
+transition to the initial snapshot, and requires the reconstructed state to match the recorded
+final snapshot. Future state-changing policies will require explicit deterministic state patches.
 
 ## Critical recall decomposition
 
@@ -37,11 +74,16 @@ Applicable critical recall is measured as four observable stages:
 3. final context inclusion;
 4. behavioral application.
 
-The stages are measured separately so storage, retrieval, packing, and decision-model failures are
-not conflated.
+The stages remain separate so storage, retrieval, packing, and decision-provider failures are not
+conflated.
 
-## Event integrity
+## External and standalone inference servers
 
-Every state transition will emit a monotonic event linked to the previous event hash and pre/post
-state hashes. The schema defines this contract now; cryptographic event construction and replay are
-future M1 implementation work.
+The decision layer is a replaceable `DecisionProvider`. A standalone inference server can
+eventually implement that interface without becoming the memory-system target. A server exposing
+persistent memory or retrieval instead implements `MemoryAdapter` and can be the RISI/CRAF target.
+
+The reserved `authorized-local-inference` profile is intentionally reported as not implemented.
+Before activation it must enforce an exact endpoint allowlist, model identity, request and response
+budgets, timeouts, redirect prohibition, credential policy, and operator approval. Application
+checks complement rather than replace host, container, firewall, or VLAN isolation.

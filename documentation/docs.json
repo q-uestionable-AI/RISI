@@ -24,6 +24,7 @@
         "pages": [
           "introduction",
           "quickstart",
+          "operator-guide",
           "concepts",
           "responsible-use",
           "changelog"
@@ -31,7 +32,7 @@
       },
       {
         "group": "Architecture",
-        "pages": ["architecture/overview"]
+        "pages": ["architecture/overview", "architecture/inference-servers"]
       }
     ]
   },

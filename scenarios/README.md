@@ -1,12 +1,13 @@
 # Scenarios
 
-Scenarios are synthetic, structured worlds used for paired RISI and CRAF episodes. They must:
+Scenarios are synthetic, structured worlds used for RISI and CRAF reference episodes. They must:
 
 - contain no real identities, secrets, accounts, or production data;
-- keep evaluator-only oracles outside target-visible memory state;
-- declare principals, permissions, attack budgets, and deterministic seeds;
+- keep evaluator-only oracles outside target-visible memory and decision state;
+- declare principals, permissions, budgets, deterministic seeds, and an executable protocol;
 - use machine-verifiable truth and decision rules;
-- distinguish proposed or exploratory conditions from headline evidence conditions.
+- distinguish proposed or exploratory conditions from evidence-supported claims.
 
-Scenario files must validate against `schemas/scenario.schema.json`. Initial examples will be added
-only after the scenario contract and truth-validation approach are approved.
+Executable scenario files are strict JSON and must conform to
+`schemas/scenario.schema.json`. The loader also performs semantic checks such as canonical world
+hash verification, seed authorization, referenced-memory existence, and input ceilings.

@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "run_id": "dep-01-local-reference",
+  "files": [
+    {
+      "path": "execution.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bytes": 128
+    }
+  ],
+  "bundle_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+}
