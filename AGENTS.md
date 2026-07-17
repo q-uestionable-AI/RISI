@@ -76,3 +76,17 @@ uv run risi --help
 - Use `feature/*` for new functionality and `fix/*` for corrections.
 - Keep unreleased code and documentation on the feature branch.
 - Tag and publish only from a clean, release-aligned `main` commit.
+
+## Cursor Cloud specific instructions
+
+- This project is a self-contained Python CLI (`risi`); there is no server, database, or GUI. The
+ startup update script runs `uv sync --locked --group dev`, so dependencies are already installed.
+- All commands run through `uv run` (see `## Core commands`); `uv` is installed at `~/.local/bin`
+ and on `PATH` via the login profile.
+- `risi run` writes an immutable evidence bundle under `--artifact-root` (default example:
+ `artifacts/<run-id>`). Re-running the same run ID fails with `artifact_failure: evidence bundle
+ already exists`. To re-run, delete that bundle (or the gitignored `artifacts/` directory) first;
+ `verify`, `replay`, and `report` are safe to repeat against an existing bundle.
+- End-to-end smoke of the harness: `uv run risi run <manifest> --approval <approval>
+ --scenario-root scenarios --artifact-root artifacts` then `verify`/`replay`/`report` on the
+ resulting bundle (example manifests live in `scenarios/examples/`).
