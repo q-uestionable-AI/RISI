@@ -216,6 +216,7 @@
     "referenceRun": {
       "oneOf": [
         { "$ref": "#/$defs/approvalReferenceRun" },
+        { "$ref": "#/$defs/obligationReferenceRun" },
         { "$ref": "#/$defs/regionReferenceRun" }
       ]
     },
@@ -243,6 +244,28 @@
         "required_memory_id": { "type": "string", "minLength": 1 },
         "action_if_below": { "type": "string", "minLength": 1 },
         "action_if_met": { "type": "string", "minLength": 1 }
+      }
+    },
+    "obligationReferenceRun": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "principal_id",
+        "tenant_id",
+        "query",
+        "top_k",
+        "required_memory_id",
+        "action_if_present",
+        "action_if_absent"
+      ],
+      "properties": {
+        "principal_id": { "type": "string", "minLength": 1 },
+        "tenant_id": { "type": "string", "minLength": 1 },
+        "query": { "type": "string", "minLength": 1 },
+        "top_k": { "type": "integer", "minimum": 1 },
+        "required_memory_id": { "type": "string", "minLength": 1 },
+        "action_if_present": { "type": "string", "minLength": 1 },
+        "action_if_absent": { "type": "string", "minLength": 1 }
       }
     },
     "regionReferenceRun": {

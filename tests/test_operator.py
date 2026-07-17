@@ -5,12 +5,15 @@ import pytest
 
 from risi.operator.models import ApprovalRecord, Capability, ExecutionLimits, RunManifest
 from risi.operator.safety import (
+    LOCAL_REFERENCE_OBLIGATION_POLICY,
     LOCAL_REFERENCE_POLICY,
     RISI_C_REFERENCE_POLICY,
     PathBoundaryError,
     authorize_run,
     resolve_existing_path,
+    safety_policy_for_manifest,
 )
+from risi.runner import capabilities_result
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 EXAMPLES = PROJECT_ROOT / "scenarios" / "examples"
@@ -50,6 +53,18 @@ def _risi_c_approval() -> ApprovalRecord:
     from risi.operator.models import load_approval_record
 
     return load_approval_record(EXAMPLES / "dep-02-risi-c-reference.approval.json")
+
+
+def _obligation_manifest() -> RunManifest:
+    from risi.operator.models import load_run_manifest
+
+    return load_run_manifest(EXAMPLES / "dat-01-local-reference.manifest.json")
+
+
+def _obligation_approval() -> ApprovalRecord:
+    from risi.operator.models import load_approval_record
+
+    return load_approval_record(EXAMPLES / "dat-01-local-reference.approval.json")
 
 
 def test_example_approval_is_bound_to_canonical_manifest() -> None:
@@ -92,6 +107,35 @@ def test_risi_c_example_uses_a_separate_closed_policy_and_exact_limits() -> None
     profile = RISI_C_REFERENCE_POLICY.to_json()
     assert profile["network"] == "denied"
     assert profile["credentials"] == "denied"
+
+
+def test_obligation_example_uses_its_closed_pure_read_safety_policy() -> None:
+    manifest = _obligation_manifest()
+    approval = _obligation_approval()
+
+    assert safety_policy_for_manifest(manifest) is LOCAL_REFERENCE_OBLIGATION_POLICY
+    assert authorize_run(manifest, approval).allowed
+    assert manifest.policy == "pure-read"
+    assert manifest.decision_provider == "deterministic-obligation"
+    assert LOCAL_REFERENCE_OBLIGATION_POLICY.ceilings == LOCAL_REFERENCE_POLICY.ceilings
+
+    changed = replace(manifest, decision_provider="deterministic-region")
+    changed_approval = replace(approval, manifest_sha256=changed.digest)
+    denied = authorize_run(changed, changed_approval)
+    assert not denied.allowed
+    assert "decision_provider_denied" in denied.reason_codes
+
+
+def test_capabilities_list_both_pure_read_decision_providers() -> None:
+    profiles = capabilities_result().data["profiles"]
+    pure_read_providers = {
+        profile["decision_provider"] for profile in profiles if profile["policy"] == "pure-read"
+    }
+
+    assert pure_read_providers == {
+        "deterministic-approval",
+        "deterministic-obligation",
+    }
 
 
 def test_manifest_cannot_self_grant_or_exceed_profile_limits() -> None:

@@ -7,7 +7,12 @@ from dataclasses import dataclass
 
 from risi.canonical import JsonObject, JsonValue, freeze_json_object
 from risi.models import EpisodeIdentity, ProposedDecision, RetrievalResult
-from risi.scenarios import DecisionProtocol, ReferenceRunProtocol, RegionDecisionProtocol
+from risi.scenarios import (
+    DecisionProtocol,
+    ObligationDecisionProtocol,
+    ReferenceRunProtocol,
+    RegionDecisionProtocol,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,6 +105,42 @@ class DeterministicApprovalProvider(DecisionProvider):
             action=action,
             rationale_memory_ids=rationale,
             parameters=parameters,
+        )
+
+
+class DeterministicObligationProvider(DecisionProvider):
+    """Apply a target-visible required-memory protocol deterministically."""
+
+    @property
+    def provider_id(self) -> str:
+        """Return the registered provider identifier."""
+        return "deterministic-obligation"
+
+    def propose(self, request: DecisionRequest) -> ProposedDecision:
+        """Propose an action based on retrieval of the required obligation.
+
+        Args:
+            request: Target-visible decision request.
+
+        Returns:
+            Deterministic synthetic action proposal.
+
+        Raises:
+            TypeError: If the request does not use an obligation protocol.
+        """
+        protocol = request.protocol
+        if not isinstance(protocol, ObligationDecisionProtocol):
+            raise TypeError("deterministic obligation provider requires an obligation protocol")
+        retrieved_ids = tuple(hit.memory_id for hit in request.retrieval.hits)
+        policy_available = protocol.required_memory_id in retrieved_ids
+        action = protocol.action_if_present if policy_available else protocol.action_if_absent
+        rationale = (protocol.required_memory_id,) if policy_available else ()
+        return ProposedDecision(
+            decision_id=f"{request.episode.episode_id}-decision-0001",
+            episode_id=request.episode.episode_id,
+            action=action,
+            rationale_memory_ids=rationale,
+            parameters={"policy_available": policy_available},
         )
 
 

@@ -105,6 +105,15 @@ LOCAL_REFERENCE_POLICY = SafetyPolicy(
     ),
 )
 
+LOCAL_REFERENCE_OBLIGATION_POLICY = SafetyPolicy(
+    profile=ExecutionProfile.LOCAL_REFERENCE,
+    capabilities=LOCAL_REFERENCE_POLICY.capabilities,
+    adapter=LOCAL_REFERENCE_POLICY.adapter,
+    decision_provider="deterministic-obligation",
+    policy=LOCAL_REFERENCE_POLICY.policy,
+    ceilings=LOCAL_REFERENCE_POLICY.ceilings,
+)
+
 CRAF_REFERENCE_POLICY = SafetyPolicy(
     profile=ExecutionProfile.LOCAL_REFERENCE,
     capabilities=LOCAL_REFERENCE_POLICY.capabilities,
@@ -153,6 +162,8 @@ def safety_policy_for_manifest(manifest: RunManifest) -> SafetyPolicy:
         return CRAF_REFERENCE_POLICY
     if manifest.policy == RISI_C_REFERENCE_POLICY.policy:
         return RISI_C_REFERENCE_POLICY
+    if manifest.decision_provider == LOCAL_REFERENCE_OBLIGATION_POLICY.decision_provider:
+        return LOCAL_REFERENCE_OBLIGATION_POLICY
     return LOCAL_REFERENCE_POLICY
 
 

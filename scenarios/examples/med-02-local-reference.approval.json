@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "manifest_sha256": "258b1a396a7c2e26bd110ebea2b9a40e7a688abdb68dcfe0d87b8863a579d6cd",
+  "approved_by": "example-operator",
+  "capabilities": [
+    "scenario.read",
+    "artifact.write",
+    "reference.execute",
+    "evidence.verify"
+  ],
+  "note": "Repository example for the synthetic MED-02 local-reference baseline."
+}

@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "run_id": "med-02-local-reference",
+  "profile": "local-reference",
+  "scenario_path": "examples/med-02-pure-read.json",
+  "scenario_sha256": "fd3cde2ffa627d400c9232262a536040ae67a6489f41ba61180477cc5df7f63f",
+  "seed": 1243577064,
+  "adapter": "reference",
+  "decision_provider": "deterministic-obligation",
+  "policy": "pure-read",
+  "capabilities": [
+    "scenario.read",
+    "artifact.write",
+    "reference.execute",
+    "evidence.verify"
+  ],
+  "limits": {
+    "episodes": 1,
+    "retrieval_calls": 4,
+    "logical_steps": 20,
+    "input_bytes": 100000,
+    "memory_records": 100,
+    "artifact_bytes": 2000000
+  }
+}
