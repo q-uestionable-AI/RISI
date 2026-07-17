@@ -79,7 +79,9 @@ uv run risi --help
 
 ## Git workflow
 
-- `main` is release-aligned.
+- `main` is the integration branch and source for the next release.
 - Use `feature/*` for new functionality and `fix/*` for corrections.
-- Keep unreleased code and documentation on the feature branch.
-- Tag and publish only from a clean, release-aligned `main` commit.
+- Merge only complete, reviewed changes through a pull request.
+- Unreleased changes may exist on `main`; public status and documentation must distinguish them
+  clearly from the current release.
+- Tag and publish only from a clean `main` commit after separate explicit release approval.
