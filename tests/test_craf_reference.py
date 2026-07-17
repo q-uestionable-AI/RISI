@@ -60,6 +60,7 @@ def test_three_arm_comparison_recovers_controlled_craf_and_protection(tmp_path: 
     verification = verify_evidence_bundle(bundle)
     replay = replay_bundle(bundle)
     comparison = _load(bundle / "evaluator" / "craf-comparison.json")
+    execution = _load(bundle / "execution.json")
     by_arm = {item["arm"]: item for item in comparison["arms"]}
 
     assert verification.run_id == "dep-01-craf-reference"
@@ -76,6 +77,10 @@ def test_three_arm_comparison_recovers_controlled_craf_and_protection(tmp_path: 
     assert by_arm["vulnerable"]["loss_stage"] == "retrieval"
     assert by_arm["protected"]["classification"] == "no_failure"
     assert all(item["source_preserved"] for item in by_arm.values())
+    assert execution["resource_use"]["episodes"]["consumed"] == 3
+    assert execution["resource_use"]["retrieval_calls"]["consumed"] == 6
+    assert execution["resource_use"]["logical_steps"]["consumed"] == 12
+    assert execution["resource_use"]["artifact_bytes"]["consumed"] == verification.total_bytes
 
 
 def test_craf_arms_share_initial_state_and_preserve_critical_source(tmp_path: Path) -> None:

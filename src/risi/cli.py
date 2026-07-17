@@ -9,7 +9,9 @@ import typer
 
 from risi import __version__
 from risi.artifacts import ArtifactError, verify_evidence_bundle
+from risi.budget import BudgetExhaustedError
 from risi.canonical import canonical_json
+from risi.evidence import compare_bundles, inspect_bundle, recover_existing_result
 from risi.operator.models import (
     CommandResult,
     OperatorInputError,
@@ -41,6 +43,8 @@ class ExitCode(IntEnum):
     BLOCKED_BY_POLICY = 3
     INTEGRITY_FAILURE = 4
     EXECUTION_FAILURE = 5
+    RESOURCE_EXHAUSTED = 6
+    INTERRUPTED = 130
 
 
 def _version_callback(value: bool) -> None:
@@ -68,6 +72,19 @@ def _validate_format(format_name: str) -> None:
         raise OperatorInputError("format must be 'text' or 'json'")
 
 
+def _render_evidence_operation(result: CommandResult) -> str:
+    if result.command == "inspect":
+        return (
+            f"{result.run_id}: evidence inspected\n"
+            f"scenario: {result.data['scenario']}\n"
+            f"bundle sha256: {result.data['bundle_hash']}"
+        )
+    differences = result.data["differences"]
+    if not isinstance(differences, (list, tuple)):
+        raise TypeError("compare differences must be an array")
+    return f"equal: {str(result.data['equal']).lower()}\ndifferences: {len(differences)}"
+
+
 def _render_text(result: CommandResult) -> str:
     if result.status is not ResultStatus.OK:
         rendered = "\n".join(f"{error.code}: {error.message}" for error in result.errors)
@@ -93,6 +110,8 @@ def _render_text(result: CommandResult) -> str:
             f"{result.run_id}: evidence verified\n"
             f"inventory sha256: {result.data['inventory_sha256']}"
         )
+    elif result.command in {"inspect", "compare"}:
+        rendered = _render_evidence_operation(result)
     elif result.command == "replay":
         if "comparison_result" in result.data:
             rendered = (
@@ -216,6 +235,8 @@ def run_command(
     format_name: str = typer.Option("text", "--format", help="Output format: text or json."),
 ) -> None:
     """Execute one guarded deterministic reference run and write its evidence bundle."""
+    manifest = None
+    approval = None
     try:
         _validate_format(format_name)
         manifest = load_run_manifest(manifest_path)
@@ -224,6 +245,45 @@ def run_command(
         _emit(execution.result, format_name)
     except SafetyBlockedError as exc:
         _emit_blocked("run", exc, format_name)
+    except BudgetExhaustedError as exc:
+        _emit(
+            CommandResult(
+                command="run",
+                status=ResultStatus.RESOURCE_EXHAUSTED,
+                run_id=None if manifest is None else manifest.run_id,
+                data={"exhaustion": exc.to_json()},
+                errors=(
+                    ResultError(
+                        code="budget_exhausted",
+                        message=str(exc),
+                        field=f"limits.{exc.resource.value}",
+                    ),
+                ),
+            ),
+            format_name,
+        )
+        raise typer.Exit(ExitCode.RESOURCE_EXHAUSTED) from exc
+    except KeyboardInterrupt as exc:
+        if manifest is not None and approval is not None:
+            try:
+                validate_run(manifest, approval, scenario_root)
+                recovered = recover_existing_result(artifact_root, manifest)
+            except (SafetyBlockedError, ValueError):
+                recovered = None
+            if recovered is not None:
+                _emit(recovered.result, format_name)
+                return
+        _emit(
+            _error_result(
+                "run",
+                ResultStatus.INTERRUPTED,
+                "interrupted",
+                "run interrupted before atomic evidence finalization",
+                run_id=None if manifest is None else manifest.run_id,
+            ),
+            format_name if format_name in {"text", "json"} else "json",
+        )
+        raise typer.Exit(ExitCode.INTERRUPTED) from exc
     except ArtifactError as exc:
         _emit(
             _error_result("run", ResultStatus.ERROR, "artifact_failure", str(exc)),
@@ -262,6 +322,64 @@ def verify_command(
     except (ArtifactError, OSError, ValueError) as exc:
         _emit(
             _error_result("verify", ResultStatus.ERROR, "integrity_failure", str(exc)),
+            format_name if format_name in {"text", "json"} else "json",
+        )
+        raise typer.Exit(ExitCode.INTEGRITY_FAILURE) from exc
+
+
+@app.command("inspect")
+def inspect_command(
+    bundle_path: Path = typer.Argument(..., help="Evidence-bundle directory."),
+    format_name: str = typer.Option("text", "--format", help="Output format: text or json."),
+) -> None:
+    """Verify and inspect a completed evidence bundle."""
+    try:
+        _validate_format(format_name)
+        summary = inspect_bundle(bundle_path)
+        _emit(
+            CommandResult(
+                command="inspect",
+                status=ResultStatus.OK,
+                run_id=summary.run_id,
+                data=summary.to_json(),
+            ),
+            format_name,
+        )
+    except OperatorInputError as exc:
+        _emit(_error_result("inspect", ResultStatus.ERROR, "invalid_input", str(exc)), "json")
+        raise typer.Exit(ExitCode.INVALID_INPUT) from exc
+    except (ArtifactError, OSError, ValueError) as exc:
+        _emit(
+            _error_result("inspect", ResultStatus.ERROR, "integrity_failure", str(exc)),
+            format_name if format_name in {"text", "json"} else "json",
+        )
+        raise typer.Exit(ExitCode.INTEGRITY_FAILURE) from exc
+
+
+@app.command("compare")
+def compare_command(
+    bundle_path_a: Path = typer.Argument(..., help="First evidence-bundle directory."),
+    bundle_path_b: Path = typer.Argument(..., help="Second evidence-bundle directory."),
+    format_name: str = typer.Option("text", "--format", help="Output format: text or json."),
+) -> None:
+    """Verify and compare two completed evidence bundles."""
+    try:
+        _validate_format(format_name)
+        comparison = compare_bundles(bundle_path_a, bundle_path_b)
+        _emit(
+            CommandResult(
+                command="compare",
+                status=ResultStatus.OK,
+                data=comparison.to_json(),
+            ),
+            format_name,
+        )
+    except OperatorInputError as exc:
+        _emit(_error_result("compare", ResultStatus.ERROR, "invalid_input", str(exc)), "json")
+        raise typer.Exit(ExitCode.INVALID_INPUT) from exc
+    except (ArtifactError, OSError, ValueError) as exc:
+        _emit(
+            _error_result("compare", ResultStatus.ERROR, "integrity_failure", str(exc)),
             format_name if format_name in {"text", "json"} else "json",
         )
         raise typer.Exit(ExitCode.INTEGRITY_FAILURE) from exc

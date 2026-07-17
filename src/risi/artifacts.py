@@ -17,6 +17,25 @@ class ArtifactError(ValueError):
 
 
 @dataclass(frozen=True, slots=True)
+class InventoryEntry:
+    """Describe one verified evidence file.
+
+    Attributes:
+        path: POSIX-style path relative to the bundle root.
+        sha256: Digest of the exact file bytes.
+        byte_count: Number of file bytes covered by the digest.
+    """
+
+    path: str
+    sha256: str
+    byte_count: int
+
+    def to_json(self) -> dict[str, JsonValue]:
+        """Return the canonical inventory-entry representation."""
+        return {"path": self.path, "sha256": self.sha256, "bytes": self.byte_count}
+
+
+@dataclass(frozen=True, slots=True)
 class BundleVerification:
     """Summarize evidence-bundle integrity verification.
 
@@ -26,6 +45,7 @@ class BundleVerification:
         bundle_hash: Canonical digest of the inventory entries.
         file_count: Number of evidence files covered by the inventory.
         total_bytes: Total bytes covered by the inventory.
+        entries: Ordered verified inventory entries.
     """
 
     run_id: str
@@ -33,6 +53,7 @@ class BundleVerification:
     bundle_hash: str
     file_count: int
     total_bytes: int
+    entries: tuple[InventoryEntry, ...] = ()
 
     def to_json(self) -> dict[str, JsonValue]:
         """Return the machine-readable verification summary."""
@@ -43,6 +64,14 @@ class BundleVerification:
             "file_count": self.file_count,
             "total_bytes": self.total_bytes,
         }
+
+
+@dataclass(frozen=True, slots=True)
+class _BundleMaterial:
+    entries: tuple[InventoryEntry, ...]
+    inventory_content: bytes
+    bundle_hash: str
+    total_bytes: int
 
 
 def json_bytes(value: object) -> bytes:
@@ -81,6 +110,46 @@ def _validate_artifact_name(name: str) -> None:
         raise ArtifactError("inventory.json is reserved by the evidence writer")
 
 
+def _prepare_bundle_material(run_id: str, files: dict[str, bytes]) -> _BundleMaterial:
+    if not files:
+        raise ArtifactError("evidence bundle must contain files")
+    for name in files:
+        _validate_artifact_name(name)
+    entries = tuple(
+        InventoryEntry(name, _sha256_bytes(files[name]), len(files[name])) for name in sorted(files)
+    )
+    bundle_hash = canonical_sha256([entry.to_json() for entry in entries])
+    inventory = {
+        "schema_version": 1,
+        "run_id": run_id,
+        "files": [entry.to_json() for entry in entries],
+        "bundle_hash": bundle_hash,
+    }
+    inventory_content = json_bytes(inventory)
+    return _BundleMaterial(
+        entries=entries,
+        inventory_content=inventory_content,
+        bundle_hash=bundle_hash,
+        total_bytes=sum(entry.byte_count for entry in entries) + len(inventory_content),
+    )
+
+
+def measure_evidence_bundle(run_id: str, files: dict[str, bytes]) -> int:
+    """Return the exact finalized size of an in-memory evidence bundle.
+
+    Args:
+        run_id: Run identifier written into the inventory.
+        files: Relative evidence filenames and exact content bytes.
+
+    Returns:
+        Total bytes including the generated ``inventory.json``.
+
+    Raises:
+        ArtifactError: If an evidence path is invalid or no files are supplied.
+    """
+    return _prepare_bundle_material(run_id, files).total_bytes
+
+
 def create_evidence_bundle(
     artifact_root: Path,
     run_id: str,
@@ -102,27 +171,11 @@ def create_evidence_bundle(
     Raises:
         ArtifactError: If paths, sizes, or destination state are unsafe.
     """
-    if not files:
-        raise ArtifactError("evidence bundle must contain files")
-    for name in files:
-        _validate_artifact_name(name)
+    material = _prepare_bundle_material(run_id, files)
     final_path = artifact_root / run_id
     if final_path.exists():
         raise ArtifactError("evidence bundle already exists; run IDs are immutable")
-    entries: list[dict[str, JsonValue]] = []
-    for name in sorted(files):
-        content = files[name]
-        entries.append({"path": name, "sha256": _sha256_bytes(content), "bytes": len(content)})
-    bundle_hash = canonical_sha256(entries)
-    inventory = {
-        "schema_version": 1,
-        "run_id": run_id,
-        "files": entries,
-        "bundle_hash": bundle_hash,
-    }
-    inventory_content = json_bytes(inventory)
-    total_bytes = sum(len(content) for content in files.values()) + len(inventory_content)
-    if total_bytes > max_bytes:
+    if material.total_bytes > max_bytes:
         raise ArtifactError("evidence bundle exceeds the approved artifact_bytes limit")
     try:
         with TemporaryDirectory(prefix=".risi-staging-", dir=artifact_root) as temporary:
@@ -131,16 +184,17 @@ def create_evidence_bundle(
                 destination = staging / Path(*PurePosixPath(name).parts)
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 destination.write_bytes(content)
-            (staging / "inventory.json").write_bytes(inventory_content)
+            (staging / "inventory.json").write_bytes(material.inventory_content)
             staging.replace(final_path)
     except OSError as exc:
         raise ArtifactError(f"cannot create evidence bundle: {exc}") from exc
     return BundleVerification(
         run_id=run_id,
-        inventory_sha256=_sha256_bytes(inventory_content),
-        bundle_hash=bundle_hash,
-        file_count=len(entries),
-        total_bytes=total_bytes,
+        inventory_sha256=_sha256_bytes(material.inventory_content),
+        bundle_hash=material.bundle_hash,
+        file_count=len(material.entries),
+        total_bytes=material.total_bytes,
+        entries=material.entries,
     )
 
 
@@ -171,7 +225,7 @@ def _validate_inventory_header(inventory: dict[str, Any]) -> tuple[str, list[Any
     return run_id, cast(list[Any], raw_entries), bundle_hash
 
 
-def _verify_entry(root: Path, raw: Any) -> tuple[dict[str, JsonValue], str, int]:
+def _verify_entry(root: Path, raw: Any) -> InventoryEntry:
     if not isinstance(raw, dict) or set(raw) != {"path", "sha256", "bytes"}:
         raise ArtifactError("bundle inventory contains an invalid file entry")
     name = raw["path"]
@@ -192,23 +246,23 @@ def _verify_entry(root: Path, raw: Any) -> tuple[dict[str, JsonValue], str, int]
     content = candidate.read_bytes()
     if len(content) != byte_count or _sha256_bytes(content) != digest:
         raise ArtifactError(f"bundle file failed integrity verification: {name}")
-    return {"path": name, "sha256": digest, "bytes": byte_count}, name, byte_count
+    return InventoryEntry(name, digest, byte_count)
 
 
 def _verify_entries(
     root: Path, raw_entries: list[Any]
-) -> tuple[list[dict[str, JsonValue]], set[str], int]:
-    entries: list[dict[str, JsonValue]] = []
+) -> tuple[tuple[InventoryEntry, ...], set[str], int]:
+    entries: list[InventoryEntry] = []
     names: set[str] = set()
     total_bytes = 0
     for raw in raw_entries:
-        entry, name, byte_count = _verify_entry(root, raw)
-        if name in names:
+        entry = _verify_entry(root, raw)
+        if entry.path in names:
             raise ArtifactError("bundle inventory contains duplicate paths")
         entries.append(entry)
-        names.add(name)
-        total_bytes += byte_count
-    return entries, names, total_bytes
+        names.add(entry.path)
+        total_bytes += entry.byte_count
+    return tuple(entries), names, total_bytes
 
 
 def verify_evidence_bundle(bundle_path: Path) -> BundleVerification:
@@ -239,7 +293,7 @@ def verify_evidence_bundle(bundle_path: Path) -> BundleVerification:
     }
     if actual_names != expected_names:
         raise ArtifactError("bundle contains missing or unlisted files")
-    expected_bundle_hash = canonical_sha256(normalized_entries)
+    expected_bundle_hash = canonical_sha256([entry.to_json() for entry in normalized_entries])
     if supplied_bundle_hash != expected_bundle_hash:
         raise ArtifactError("bundle inventory hash does not match its entries")
     return BundleVerification(
@@ -248,6 +302,7 @@ def verify_evidence_bundle(bundle_path: Path) -> BundleVerification:
         bundle_hash=expected_bundle_hash,
         file_count=len(normalized_entries),
         total_bytes=total_bytes + len(inventory_content),
+        entries=normalized_entries,
     )
 
 

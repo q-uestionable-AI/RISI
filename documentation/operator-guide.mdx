@@ -28,6 +28,8 @@ an agent's writable context when a stronger boundary is required.
 | `3` | Blocked by safety policy |
 | `4` | Evidence or replay integrity failure |
 | `5` | Execution or artifact failure |
+| `6` | Deterministic resource budget exhausted |
+| `130` | Cooperative interruption before evidence finalization |
 
 ## Evidence bundle
 
@@ -45,6 +47,16 @@ and result count.
 `inventory.json` records the path, size, and SHA-256 of every file. Retain the inventory SHA-256
 reported by `risi run` outside the bundle when an independent integrity anchor is needed.
 
+The execution summary and run result report approved and consumed values for episodes, retrieval
+calls, logical steps, scenario input bytes, source-memory records, and complete bundle bytes.
+Budget exhaustion is an engineering result with its own status and exit code; it does not produce a
+completed experimental bundle or a RISI/CRAF outcome.
+
+`risi inspect <bundle> --format json` verifies the complete inventory before returning a closed
+summary of run, manifest, scenario, policy, result, resource use, digests, and inventoried paths.
+`risi compare <bundle-a> <bundle-b> --format json` verifies both bundles and returns exact equality
+or stable differing evidence paths and semantic anchors.
+
 The `craf-reference` manifest requests exactly three episodes and six retrieval calls. Its result is
 `controlled_mechanism_recovered` only when the required control, vulnerable, and protected pattern
 passes every evaluator invariant. This is a local synthetic engineering result, not a finding about
@@ -58,7 +70,14 @@ decisions are safe.
 
 ## Autonomous operation
 
-An agent may inspect capabilities, prepare a manifest, validate an approved run, execute it, verify
-and replay its evidence, and propose an interpretation. Human review remains responsible for scope,
-authorization, release, and research claims. Model prose is never a substitute for the evidence
-bundle or deterministic checks.
+An agent may inspect capabilities, validate a human-approved manifest, execute it, verify and replay
+its evidence, compare verified bundles, and propose an interpretation. Re-invoking a run
+returns the existing verified result with `reused: true`; an incomplete, changed, or tampered final
+path fails closed without overwrite or deletion.
+
+A1 is synchronous. The process result is authoritative, interruption is cooperative, and automatic
+retry count is zero. There is no status service, active cancel command, wall-clock experimental
+deadline, or asynchronous job surface. Capability discovery reports these dispositions and the
+absence of approval, manifest, evaluator, evidence-edit, evidence-delete, and human-acceptance
+authority. Human review remains responsible for scope, authorization, release, and research claims.
+Model prose is never a substitute for the evidence bundle or deterministic checks.

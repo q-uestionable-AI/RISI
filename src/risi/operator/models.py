@@ -54,6 +54,8 @@ class ResultStatus(StrEnum):
     OK = "ok"
     ERROR = "error"
     BLOCKED = "blocked"
+    RESOURCE_EXHAUSTED = "resource_exhausted"
+    INTERRUPTED = "interrupted"
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,7 +65,7 @@ class ExecutionLimits:
     Attributes:
         episodes: Maximum episodes in the run.
         retrieval_calls: Maximum retrieval operations.
-        logical_steps: Maximum deterministic logical-clock advances.
+        logical_steps: Maximum deterministic episode-start, retrieval, and decision operations.
         input_bytes: Maximum scenario input size.
         memory_records: Maximum source memory records.
         artifact_bytes: Maximum evidence-bundle size.

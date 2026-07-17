@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -11,7 +12,9 @@ from risi.artifacts import (
     create_evidence_bundle,
     json_bytes,
     json_lines_bytes,
+    measure_evidence_bundle,
 )
+from risi.budget import BudgetLedger, BudgetResource
 from risi.canonical import JsonValue
 from risi.confidentiality import (
     ObserverExchange,
@@ -39,6 +42,10 @@ from risi.decision import (
     DeterministicRegionProvider,
 )
 from risi.evaluator import DecisionAssessment, MemoryOracle, evaluate_decision
+from risi.evidence import (
+    command_result_from_execution,
+    recover_existing_result,
+)
 from risi.models import (
     EpisodeIdentity,
     EventType,
@@ -133,6 +140,52 @@ class RunExecution:
     verification: BundleVerification
 
 
+_EvidenceBuilder = Callable[
+    [dict[str, JsonValue]],
+    tuple[dict[str, bytes], dict[str, JsonValue]],
+]
+
+
+def _initial_budget(validated: ValidatedRun) -> BudgetLedger:
+    try:
+        input_bytes = validated.scenario_path.stat().st_size
+    except OSError as exc:
+        raise ValueError("validated scenario input is no longer readable") from exc
+    ledger = BudgetLedger(validated.manifest.limits)
+    ledger = ledger.consume(BudgetResource.INPUT_BYTES, input_bytes)
+    return ledger.consume(BudgetResource.MEMORY_RECORDS, len(validated.scenario.memories))
+
+
+def _consume_episode_start(ledger: BudgetLedger) -> BudgetLedger:
+    ledger = ledger.consume(BudgetResource.EPISODES)
+    return ledger.consume(BudgetResource.LOGICAL_STEPS)
+
+
+def _consume_retrieval(ledger: BudgetLedger) -> BudgetLedger:
+    ledger = ledger.consume(BudgetResource.RETRIEVAL_CALLS)
+    return ledger.consume(BudgetResource.LOGICAL_STEPS)
+
+
+def _consume_decision(ledger: BudgetLedger) -> BudgetLedger:
+    return ledger.consume(BudgetResource.LOGICAL_STEPS)
+
+
+def _prepare_budgeted_evidence(
+    run_id: str,
+    ledger: BudgetLedger,
+    builder: _EvidenceBuilder,
+) -> tuple[dict[str, bytes], dict[str, JsonValue]]:
+    artifact_bytes = 0
+    for _ in range(8):
+        candidate = ledger.consume(BudgetResource.ARTIFACT_BYTES, artifact_bytes)
+        files, execution = builder(candidate.resource_use().to_json())
+        measured = measure_evidence_bundle(run_id, files)
+        if measured == artifact_bytes:
+            return files, execution
+        artifact_bytes = measured
+    raise RuntimeError("artifact resource accounting did not converge")
+
+
 @dataclass(frozen=True, slots=True)
 class _EvidenceMaterial:
     validated: ValidatedRun
@@ -144,6 +197,13 @@ class _EvidenceMaterial:
     decision: dict[str, JsonValue]
     assessment: DecisionAssessment
     events: tuple[TraceEvent, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class _CrafSharedMaterial:
+    initial_state: StateSnapshot
+    critical_oracle: MemoryOracle
+    initial_critical: MemoryRecord
 
 
 @dataclass(frozen=True, slots=True)
@@ -205,10 +265,54 @@ def capabilities_result() -> CommandResult:
             "note": "Reserved for an exact allowlisted public HTTPS endpoint and model.",
         },
     ]
+    lifecycle: list[JsonValue] = [
+        {"operation": operation, "disposition": "implemented"}
+        for operation in (
+            "capabilities",
+            "validate",
+            "run",
+            "verify",
+            "replay",
+            "inspect",
+            "compare",
+            "report",
+            "idempotent-reinvocation",
+            "cooperative-interruption",
+            "atomic-finalization",
+        )
+    ]
+    lifecycle.extend(
+        {"operation": operation, "disposition": "denied"}
+        for operation in (
+            "status-service",
+            "cancel-command",
+            "wall-clock-deadlines",
+            "automatic-retries",
+            "async-jobs",
+            "staging-as-evidence",
+        )
+    )
+    authority_denials: list[JsonValue] = [
+        "approval.create",
+        "approval.edit",
+        "evaluator.edit",
+        "manifest.create",
+        "manifest.edit",
+        "evidence.edit",
+        "evidence.delete",
+        "human-review.accept",
+    ]
     return CommandResult(
         command="capabilities",
         status=ResultStatus.OK,
-        data={"profiles": profiles, "future_profiles": future_profiles},
+        data={
+            "profiles": profiles,
+            "future_profiles": future_profiles,
+            "lifecycle": lifecycle,
+            "authority_denials": authority_denials,
+            "execution_model": "synchronous",
+            "automatic_retry_count": 0,
+        },
     )
 
 
@@ -326,6 +430,13 @@ def _execute_run(validated: ValidatedRun, artifact_root: Path) -> RunExecution:
     Returns:
         Completed run result and evidence-bundle integrity anchor.
     """
+    recovered = recover_existing_result(artifact_root, validated.manifest)
+    if recovered is not None:
+        return RunExecution(
+            recovered.result,
+            recovered.bundle_path,
+            recovered.verification,
+        )
     if validated.manifest.policy == CRAF_REFERENCE_POLICY.policy:
         return _execute_craf_reference(validated, artifact_root)
     if validated.manifest.policy == RISI_C_REFERENCE_POLICY.policy:
@@ -338,6 +449,8 @@ def _execute_pure_read(validated: ValidatedRun, artifact_root: Path) -> RunExecu
     manifest = validated.manifest
     scenario = validated.scenario
     resolved_artifact_root = resolve_artifact_root(artifact_root)
+    ledger = _initial_budget(validated)
+    ledger = _consume_episode_start(ledger)
     episode = EpisodeIdentity(
         scenario_id=scenario.scenario_id,
         episode_id=scenario.evaluator.episode_id,
@@ -372,6 +485,7 @@ def _execute_pure_read(validated: ValidatedRun, artifact_root: Path) -> RunExecu
         text=scenario.protocol.query,
         top_k=scenario.protocol.top_k,
     )
+    ledger = _consume_retrieval(ledger)
     retrieval = adapter.retrieve(query)
     context = adapter.assemble_context(retrieval)
     provider: DecisionProvider
@@ -383,6 +497,7 @@ def _execute_pure_read(validated: ValidatedRun, artifact_root: Path) -> RunExecu
         raise TypeError("validated pure-read run has an unsupported decision protocol")
     if provider.provider_id != manifest.decision_provider:
         raise ValueError("registered decision provider does not match the manifest")
+    ledger = _consume_decision(ledger)
     decision = provider.propose(
         DecisionRequest(
             episode=episode,
@@ -411,18 +526,21 @@ def _execute_pure_read(validated: ValidatedRun, artifact_root: Path) -> RunExecu
     final_state = adapter.inspect_state()
     events = adapter.export_trace()
     verify_trace(events)
-    files = _evidence_files(
-        _EvidenceMaterial(
-            validated=validated,
-            initial_state=initial_state,
-            final_state=final_state,
-            query=query,
-            retrieval=retrieval,
-            context=context,
-            decision=decision.to_json(),
-            assessment=assessment,
-            events=events,
-        )
+    material = _EvidenceMaterial(
+        validated=validated,
+        initial_state=initial_state,
+        final_state=final_state,
+        query=query,
+        retrieval=retrieval,
+        context=context,
+        decision=decision.to_json(),
+        assessment=assessment,
+        events=events,
+    )
+    files, execution = _prepare_budgeted_evidence(
+        manifest.run_id,
+        ledger,
+        lambda resource_use: _evidence_files(material, resource_use),
     )
     verification = create_evidence_bundle(
         resolved_artifact_root,
@@ -431,20 +549,11 @@ def _execute_pure_read(validated: ValidatedRun, artifact_root: Path) -> RunExecu
         max_bytes=manifest.limits.artifact_bytes,
     )
     bundle_path = resolved_artifact_root / manifest.run_id
-    result = CommandResult(
-        command="run",
-        status=ResultStatus.OK,
-        run_id=manifest.run_id,
-        data={
-            "scenario_id": scenario.scenario_id,
-            "episode_id": episode.episode_id,
-            "safe": assessment.safe,
-            "reason_code": assessment.reason_code,
-            "bundle_path": str(bundle_path),
-            "inventory_sha256": verification.inventory_sha256,
-            "bundle_hash": verification.bundle_hash,
-            "event_count": len(events),
-        },
+    result = command_result_from_execution(
+        execution,
+        bundle_path,
+        verification,
+        reused=False,
     )
     return RunExecution(result, bundle_path, verification)
 
@@ -457,6 +566,7 @@ def _execute_craf_reference(validated: ValidatedRun, artifact_root: Path) -> Run
     if interaction is None:
         raise AssertionError("validated craf-reference run is missing its interaction protocol")
     resolved_artifact_root = resolve_artifact_root(artifact_root)
+    ledger = _initial_budget(validated)
     episode = EpisodeIdentity(
         scenario_id=scenario.scenario_id,
         episode_id=scenario.evaluator.episode_id,
@@ -504,23 +614,34 @@ def _execute_craf_reference(validated: ValidatedRun, artifact_root: Path) -> Run
             {**adaptive_settings, "protected_criticality": "protected-recall"},
         ),
     }
-    arms = tuple(
-        _execute_craf_arm(
+    shared = _CrafSharedMaterial(initial_state, critical_oracle, initial_critical)
+    arm_materials: list[_CrafArmMaterial] = []
+    for arm in CrafArm:
+        material, ledger = _execute_craf_arm(
             validated,
-            initial_state,
+            shared,
             arm,
             policies[arm],
-            critical_oracle,
-            initial_critical,
+            ledger,
         )
-        for arm in CrafArm
-    )
+        arm_materials.append(material)
+    arms = tuple(arm_materials)
     comparison = assess_craf_comparison(
         scenario.scenario_id,
         state_snapshot_hash(initial_state),
         tuple(arm.craf_assessment for arm in arms),
     )
-    files, execution = _craf_evidence_files(validated, initial_state, arms, comparison)
+    files, execution = _prepare_budgeted_evidence(
+        manifest.run_id,
+        ledger,
+        lambda resource_use: _craf_evidence_files(
+            validated,
+            initial_state,
+            arms,
+            comparison,
+            resource_use,
+        ),
+    )
     verification = create_evidence_bundle(
         resolved_artifact_root,
         manifest.run_id,
@@ -528,37 +649,28 @@ def _execute_craf_reference(validated: ValidatedRun, artifact_root: Path) -> Run
         max_bytes=manifest.limits.artifact_bytes,
     )
     bundle_path = resolved_artifact_root / manifest.run_id
-    result = CommandResult(
-        command="run",
-        status=ResultStatus.OK,
-        run_id=manifest.run_id,
-        data={
-            "scenario_id": scenario.scenario_id,
-            "episode_id": episode.episode_id,
-            "comparison_result": comparison.result.value,
-            "bundle_path": str(bundle_path),
-            "inventory_sha256": verification.inventory_sha256,
-            "bundle_hash": verification.bundle_hash,
-            "event_count": execution["event_count"],
-            "arms": execution["arms"],
-        },
+    result = command_result_from_execution(
+        execution,
+        bundle_path,
+        verification,
+        reused=False,
     )
     return RunExecution(result, bundle_path, verification)
 
 
 def _execute_craf_arm(
     validated: ValidatedRun,
-    initial_state: StateSnapshot,
+    shared: _CrafSharedMaterial,
     arm: CrafArm,
     policy: PolicyConfiguration,
-    critical_oracle: MemoryOracle,
-    initial_critical: MemoryRecord,
-) -> _CrafArmMaterial:
+    ledger: BudgetLedger,
+) -> tuple[_CrafArmMaterial, BudgetLedger]:
     scenario = validated.scenario
     interaction = scenario.craf_reference
     if interaction is None:
         raise AssertionError("craf-reference interaction is required")
-    adapter = ReferenceMemoryAdapter(initial_state)
+    ledger = _consume_episode_start(ledger)
+    adapter = ReferenceMemoryAdapter(shared.initial_state)
     adapter.record_event(
         EventType.EPISODE_STARTED,
         EventVisibility.EVALUATOR,
@@ -575,6 +687,7 @@ def _execute_craf_arm(
         text=interaction.query,
         top_k=interaction.top_k,
     )
+    ledger = _consume_retrieval(ledger)
     interaction_retrieval = adapter.retrieve(interaction_query)
     interaction_context = adapter.assemble_context(interaction_retrieval)
     if tuple(hit.memory_id for hit in interaction_retrieval.hits) != (
@@ -588,14 +701,16 @@ def _execute_craf_arm(
         text=scenario.protocol.query,
         top_k=scenario.protocol.top_k,
     )
+    ledger = _consume_retrieval(ledger)
     decision_retrieval = adapter.retrieve(decision_query)
     decision_context = adapter.assemble_context(decision_retrieval)
     provider = DeterministicApprovalProvider()
     if provider.provider_id != validated.manifest.decision_provider:
         raise ValueError("registered decision provider does not match the manifest")
+    ledger = _consume_decision(ledger)
     decision = provider.propose(
         DecisionRequest(
-            episode=initial_state.episode,
+            episode=shared.initial_state.episode,
             context=decision_context,
             retrieval=decision_retrieval,
             facts=scenario.facts,
@@ -608,15 +723,21 @@ def _execute_craf_arm(
         {"decision": decision.to_json()},
     )
     decision_assessment = evaluate_decision(decision, scenario.evaluator.decision_oracle)
-    final_critical = _optional_memory_by_id(adapter.inspect_state(), critical_oracle.memory_id)
+    final_critical = _optional_memory_by_id(
+        adapter.inspect_state(),
+        shared.critical_oracle.memory_id,
+    )
     craf_assessment = assess_craf_trial(
         CrafTrialEvidence(
             arm=arm,
-            initial_memory=initial_critical,
+            initial_memory=shared.initial_critical,
             final_memory=final_critical,
-            oracle=critical_oracle,
+            oracle=shared.critical_oracle,
             logical_time=adapter.inspect_state().logical_time,
-            oracle_applicable=_critical_oracle_applicable(scenario, critical_oracle),
+            oracle_applicable=_critical_oracle_applicable(
+                scenario,
+                shared.critical_oracle,
+            ),
             retrieval_memory_ids=tuple(hit.memory_id for hit in decision_retrieval.hits),
             context_memory_ids=tuple(hit.memory_id for hit in decision_retrieval.hits),
             decision=decision,
@@ -652,20 +773,23 @@ def _execute_craf_arm(
     final_state = adapter.inspect_state()
     events = adapter.export_trace()
     verify_trace(events)
-    return _CrafArmMaterial(
-        arm=arm,
-        policy=policy,
-        final_state=final_state,
-        interaction_query=interaction_query,
-        interaction_retrieval=interaction_retrieval,
-        interaction_context=interaction_context,
-        decision_query=decision_query,
-        decision_retrieval=decision_retrieval,
-        decision_context=decision_context,
-        decision=decision,
-        decision_assessment=decision_assessment,
-        craf_assessment=craf_assessment,
-        events=events,
+    return (
+        _CrafArmMaterial(
+            arm=arm,
+            policy=policy,
+            final_state=final_state,
+            interaction_query=interaction_query,
+            interaction_retrieval=interaction_retrieval,
+            interaction_context=interaction_context,
+            decision_query=decision_query,
+            decision_retrieval=decision_retrieval,
+            decision_context=decision_context,
+            decision=decision,
+            decision_assessment=decision_assessment,
+            craf_assessment=craf_assessment,
+            events=events,
+        ),
+        ledger,
     )
 
 
@@ -680,6 +804,7 @@ def _execute_risi_c_reference(validated: ValidatedRun, artifact_root: Path) -> R
     if not isinstance(scenario.protocol, RegionDecisionProtocol):
         raise TypeError("validated risi-c-reference run is missing its region protocol")
     resolved_artifact_root = resolve_artifact_root(artifact_root)
+    ledger = _initial_budget(validated)
     episode = EpisodeIdentity(
         scenario_id=scenario.scenario_id,
         episode_id=scenario.evaluator.episode_id,
@@ -725,11 +850,19 @@ def _execute_risi_c_reference(validated: ValidatedRun, artifact_root: Path) -> R
             {"top_k": top_k, "read_side_updates": False},
         ),
     }
-    arms = tuple(
-        _execute_risi_c_arm(validated, initial_state, pair, arm, policies[pair])
-        for pair in RisiCPair
-        for arm in RisiCArm
-    )
+    arm_materials: list[_RisiCArmMaterial] = []
+    for pair in RisiCPair:
+        for arm in RisiCArm:
+            material, ledger = _execute_risi_c_arm(
+                validated,
+                initial_state,
+                pair,
+                arm,
+                policies[pair],
+                ledger,
+            )
+            arm_materials.append(material)
+    arms = tuple(arm_materials)
     by_identity = {(material.pair, material.arm): material for material in arms}
     pair_assessments: dict[RisiCPair, RisiCPairAssessment] = {}
     for pair in RisiCPair:
@@ -749,7 +882,17 @@ def _execute_risi_c_reference(validated: ValidatedRun, artifact_root: Path) -> R
         pair_assessments[RisiCPair.VULNERABLE],
         pair_assessments[RisiCPair.PURE_READ],
     )
-    files, execution = _risi_c_evidence_files(validated, initial_state, arms, comparison)
+    files, execution = _prepare_budgeted_evidence(
+        manifest.run_id,
+        ledger,
+        lambda resource_use: _risi_c_evidence_files(
+            validated,
+            initial_state,
+            arms,
+            comparison,
+            resource_use,
+        ),
+    )
     verification = create_evidence_bundle(
         resolved_artifact_root,
         manifest.run_id,
@@ -757,20 +900,11 @@ def _execute_risi_c_reference(validated: ValidatedRun, artifact_root: Path) -> R
         max_bytes=manifest.limits.artifact_bytes,
     )
     bundle_path = resolved_artifact_root / manifest.run_id
-    result = CommandResult(
-        command="run",
-        status=ResultStatus.OK,
-        run_id=manifest.run_id,
-        data={
-            "scenario_id": scenario.scenario_id,
-            "episode_id": episode.episode_id,
-            "comparison_result": comparison.result.value,
-            "bundle_path": str(bundle_path),
-            "inventory_sha256": verification.inventory_sha256,
-            "bundle_hash": verification.bundle_hash,
-            "event_count": execution["event_count"],
-            "pairs": execution["pairs"],
-        },
+    result = command_result_from_execution(
+        execution,
+        bundle_path,
+        verification,
+        reused=False,
     )
     return RunExecution(result, bundle_path, verification)
 
@@ -781,7 +915,8 @@ def _execute_risi_c_arm(
     pair: RisiCPair,
     arm: RisiCArm,
     policy: PolicyConfiguration,
-) -> _RisiCArmMaterial:
+    ledger: BudgetLedger,
+) -> tuple[_RisiCArmMaterial, BudgetLedger]:
     scenario = validated.scenario
     protocol = scenario.risi_c_reference
     oracle = scenario.risi_c_oracle
@@ -791,6 +926,7 @@ def _execute_risi_c_arm(
         or not isinstance(scenario.protocol, RegionDecisionProtocol)
     ):
         raise AssertionError("risi-c-reference contracts are required")
+    ledger = _consume_episode_start(ledger)
     adapter = ReferenceMemoryAdapter(initial_state)
     adapter.record_event(
         EventType.EPISODE_STARTED,
@@ -809,6 +945,7 @@ def _execute_risi_c_arm(
         text=protocol.hidden_query if arm is RisiCArm.HIDDEN else protocol.sham_query,
         top_k=protocol.event_top_k,
     )
+    ledger = _consume_retrieval(ledger)
     victim_retrieval = adapter.retrieve(victim_query)
     victim_context = adapter.assemble_context(victim_retrieval)
     expected_victim_memory = (
@@ -823,6 +960,7 @@ def _execute_risi_c_arm(
         text=protocol.observer_query,
         top_k=protocol.observer_top_k,
     )
+    ledger = _consume_retrieval(ledger)
     observer_retrieval = adapter.retrieve(observer_query)
     adapter.assemble_context(observer_retrieval)
     observer_ids = tuple(hit.memory_id for hit in observer_retrieval.hits)
@@ -848,11 +986,13 @@ def _execute_risi_c_arm(
         text=scenario.protocol.query,
         top_k=scenario.protocol.top_k,
     )
+    ledger = _consume_retrieval(ledger)
     decision_retrieval = adapter.retrieve(decision_query)
     decision_context = adapter.assemble_context(decision_retrieval)
     provider = DeterministicRegionProvider()
     if provider.provider_id != validated.manifest.decision_provider:
         raise ValueError("registered decision provider does not match the manifest")
+    ledger = _consume_decision(ledger)
     decision = provider.propose(
         DecisionRequest(
             episode=initial_state.episode,
@@ -883,23 +1023,26 @@ def _execute_risi_c_arm(
         raise ValueError("risi-c-reference changed source memories")
     events = adapter.export_trace()
     verify_trace(events)
-    return _RisiCArmMaterial(
-        pair=pair,
-        arm=arm,
-        policy=policy,
-        final_state=final_state,
-        victim_query=victim_query,
-        victim_retrieval=victim_retrieval,
-        victim_context=victim_context,
-        observer_query=observer_query,
-        observer_retrieval=observer_retrieval,
-        observer_view=observer_view,
-        decision_query=decision_query,
-        decision_retrieval=decision_retrieval,
-        decision_context=decision_context,
-        decision=decision,
-        decision_assessment=decision_assessment,
-        events=events,
+    return (
+        _RisiCArmMaterial(
+            pair=pair,
+            arm=arm,
+            policy=policy,
+            final_state=final_state,
+            victim_query=victim_query,
+            victim_retrieval=victim_retrieval,
+            victim_context=victim_context,
+            observer_query=observer_query,
+            observer_retrieval=observer_retrieval,
+            observer_view=observer_view,
+            decision_query=decision_query,
+            decision_retrieval=decision_retrieval,
+            decision_context=decision_context,
+            decision=decision,
+            decision_assessment=decision_assessment,
+            events=events,
+        ),
+        ledger,
     )
 
 
@@ -947,6 +1090,7 @@ def _craf_evidence_files(
     initial_state: StateSnapshot,
     arms: tuple[_CrafArmMaterial, ...],
     comparison: CrafComparisonAssessment,
+    resource_use: dict[str, JsonValue],
 ) -> tuple[dict[str, bytes], dict[str, JsonValue]]:
     manifest = validated.manifest
     arm_summaries: list[JsonValue] = [
@@ -973,6 +1117,7 @@ def _craf_evidence_files(
         "initial_state_hash": state_snapshot_hash(initial_state),
         "event_count": sum(len(arm.events) for arm in arms),
         "arms": arm_summaries,
+        "resource_use": resource_use,
     }
     files = {
         "manifest.json": json_bytes(manifest.to_json()),
@@ -1016,6 +1161,7 @@ def _risi_c_evidence_files(
     initial_state: StateSnapshot,
     arms: tuple[_RisiCArmMaterial, ...],
     comparison: RisiCComparisonAssessment,
+    resource_use: dict[str, JsonValue],
 ) -> tuple[dict[str, bytes], dict[str, JsonValue]]:
     manifest = validated.manifest
     pair_assessments = {pair.pair: pair for pair in comparison.pairs}
@@ -1056,6 +1202,7 @@ def _risi_c_evidence_files(
         "initial_state_hash": state_snapshot_hash(initial_state),
         "event_count": sum(len(arm.events) for arm in arms),
         "pairs": pair_summaries,
+        "resource_use": resource_use,
     }
     files = {
         "manifest.json": json_bytes(manifest.to_json()),
@@ -1165,22 +1312,28 @@ def _render_craf_report(
     return "\n".join(lines)
 
 
-def _evidence_files(material: _EvidenceMaterial) -> dict[str, bytes]:
+def _evidence_files(
+    material: _EvidenceMaterial,
+    resource_use: dict[str, JsonValue],
+) -> tuple[dict[str, bytes], dict[str, JsonValue]]:
     manifest = material.validated.manifest
     execution: dict[str, JsonValue] = {
         "schema_version": 1,
         "run_id": manifest.run_id,
+        "scenario_id": material.validated.scenario.scenario_id,
         "manifest_sha256": manifest.digest,
         "episode_id": material.validated.scenario.evaluator.episode_id,
+        "policy": manifest.policy,
         "status": "succeeded",
         "safe": material.assessment.safe,
         "reason_code": material.assessment.reason_code,
         "initial_state_hash": state_snapshot_hash(material.initial_state),
         "final_state_hash": state_snapshot_hash(material.final_state),
         "event_count": len(material.events),
+        "resource_use": resource_use,
     }
     report = _render_report(execution, material.retrieval, material.decision, material.assessment)
-    return {
+    files = {
         "manifest.json": json_bytes(manifest.to_json()),
         "approval.json": json_bytes(material.validated.approval.to_json()),
         "target-scenario.json": json_bytes(material.validated.scenario.target_view()),
@@ -1197,6 +1350,7 @@ def _evidence_files(material: _EvidenceMaterial) -> dict[str, bytes]:
         "execution.json": json_bytes(execution),
         "report.md": report.encode(),
     }
+    return files, execution
 
 
 def _render_report(

@@ -52,6 +52,16 @@ def test_capabilities_reserve_remote_inference_without_enabling_it() -> None:
     assert implemented["local-reference"]["credentials"] == "denied"
     assert set(reserved) == {"authorized-local-inference", "authorized-remote-inference"}
     assert all(profile["status"] == "not-implemented" for profile in reserved.values())
+    lifecycle = {item["operation"]: item["disposition"] for item in payload["data"]["lifecycle"]}
+    assert lifecycle["inspect"] == "implemented"
+    assert lifecycle["compare"] == "implemented"
+    assert lifecycle["idempotent-reinvocation"] == "implemented"
+    assert lifecycle["status-service"] == "denied"
+    assert lifecycle["cancel-command"] == "denied"
+    assert lifecycle["wall-clock-deadlines"] == "denied"
+    assert lifecycle["automatic-retries"] == "denied"
+    assert lifecycle["async-jobs"] == "denied"
+    assert payload["data"]["automatic_retry_count"] == 0
 
 
 def test_json_schemas_are_parseable() -> None:
