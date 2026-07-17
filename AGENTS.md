@@ -9,10 +9,12 @@ must never be copied into this repository.
 
 ## Private vault ops
 
-Session sequence, boards, and plan/approve gates are governed by the vault mode card at
-`C:\Users\richs\vaults\MLSecOps Lab\RISI\Project Instructions.md`. Follow that card and keep the
-active plan, boards, and vault-root `Project-Status.md` current per its session habit. Do not copy
-private charter or research evidence into this repository.
+Session sequence, boards, and plan/approve gates are governed by a private mode card configured
+outside this repository. The operator must set `RISI_VAULT_ROOT` to the private research-vault
+root. Read `RISI/Project Instructions.md` beneath that root and keep the active plan, boards, and
+vault-root `Project-Status.md` current per its session habit. If the configured location is
+unavailable, stop and request it from the operator. Do not copy private charter or research
+evidence into this repository.
 
 ## Operating rules
 
