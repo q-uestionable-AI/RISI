@@ -7,6 +7,13 @@ RISI is a pre-experimental security research project for Retrieval-Induced State
 The authoritative research charter is maintained separately in the private research vault and
 must never be copied into this repository.
 
+## Private vault ops
+
+Session sequence, boards, and plan/approve gates are governed by the vault mode card at
+`C:\Users\richs\vaults\MLSecOps Lab\RISI\Project Instructions.md`. Follow that card and keep the
+active plan, boards, and vault-root `Project-Status.md` current per its session habit. Do not copy
+private charter or research evidence into this repository.
+
 ## Operating rules
 
 - Work in plan/approve mode. Read relevant files, state the plan, and wait for approval before
