@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "manifest_sha256": "4edc85768e22ee253a92c858343c3a49e1665835ce799ea9d86dae5d7b320a6f",
+  "approved_by": "example-operator",
+  "capabilities": [
+    "scenario.read",
+    "artifact.write",
+    "reference.execute",
+    "evidence.verify"
+  ],
+  "note": "Repository example for the synthetic DEP-03 local-reference baseline."
+}

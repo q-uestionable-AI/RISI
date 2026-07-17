@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "manifest_sha256": "7763c822fdfb7dd3c9ffa6e9f79565b94f617648082e00f6bd7134108ce2c8dc",
+  "approved_by": "example-operator",
+  "capabilities": [
+    "scenario.read",
+    "artifact.write",
+    "reference.execute",
+    "evidence.verify"
+  ],
+  "note": "Repository example for the synthetic IAM-01 local-reference baseline."
+}

@@ -58,6 +58,41 @@ class ReferenceRunProtocol:
 
 
 @dataclass(frozen=True, slots=True)
+class ObligationDecisionProtocol:
+    """Describe a target-visible required-memory decision protocol.
+
+    Attributes:
+        principal_id: Principal issuing the retrieval.
+        tenant_id: Tenant authorization boundary.
+        query: Synthetic retrieval query.
+        top_k: Maximum retrieval results.
+        required_memory_id: Obligation memory needed by the decision provider.
+        action_if_present: Proposed action when the obligation is retrieved.
+        action_if_absent: Proposed action when the obligation is not retrieved.
+    """
+
+    principal_id: str
+    tenant_id: str
+    query: str
+    top_k: int
+    required_memory_id: str
+    action_if_present: str
+    action_if_absent: str
+
+    def to_json(self) -> dict[str, JsonValue]:
+        """Return the JSON-compatible protocol representation."""
+        return {
+            "principal_id": self.principal_id,
+            "tenant_id": self.tenant_id,
+            "query": self.query,
+            "top_k": self.top_k,
+            "required_memory_id": self.required_memory_id,
+            "action_if_present": self.action_if_present,
+            "action_if_absent": self.action_if_absent,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class CrafReferenceProtocol:
     """Describe the target-visible truthful interaction used in WP2B.
 
@@ -184,7 +219,7 @@ class RisiCReferenceProtocol:
         }
 
 
-DecisionProtocol = ReferenceRunProtocol | RegionDecisionProtocol
+DecisionProtocol = ReferenceRunProtocol | RegionDecisionProtocol | ObligationDecisionProtocol
 
 
 @dataclass(frozen=True, slots=True)
@@ -381,6 +416,15 @@ def _parse_protocol(value: Any) -> DecisionProtocol:
         "action_if_allowed",
         "allowed_alternatives",
     }
+    obligation_fields = {
+        "principal_id",
+        "tenant_id",
+        "query",
+        "top_k",
+        "required_memory_id",
+        "action_if_present",
+        "action_if_absent",
+    }
     if set(protocol) == approval_fields:
         parsed = ReferenceRunProtocol(
             principal_id=_require_string(protocol["principal_id"], "principal_id"),
@@ -400,6 +444,21 @@ def _parse_protocol(value: Any) -> DecisionProtocol:
         if parsed.top_k <= 0 or parsed.minimum_approvals <= 0:
             raise OperatorInputError("reference_run numeric limits must be positive")
         return parsed
+    if set(protocol) == obligation_fields:
+        obligation = ObligationDecisionProtocol(
+            principal_id=_require_string(protocol["principal_id"], "principal_id"),
+            tenant_id=_require_string(protocol["tenant_id"], "tenant_id"),
+            query=_require_string(protocol["query"], "query"),
+            top_k=_require_integer(protocol["top_k"], "top_k"),
+            required_memory_id=_require_string(
+                protocol["required_memory_id"], "required_memory_id"
+            ),
+            action_if_present=_require_string(protocol["action_if_present"], "action_if_present"),
+            action_if_absent=_require_string(protocol["action_if_absent"], "action_if_absent"),
+        )
+        if obligation.top_k <= 0:
+            raise OperatorInputError("obligation reference_run top_k must be positive")
+        return obligation
     _exact_keys(protocol, region_fields, "reference_run")
     alternatives = tuple(
         _require_string(item, "allowed_alternatives item")
@@ -781,7 +840,9 @@ def _validate_decision_protocol(
     if isinstance(protocol, ReferenceRunProtocol):
         if protocol.approval_count_fact not in facts:
             raise OperatorInputError("reference_run requires an unknown world-state fact")
-    elif protocol.dataset_class_fact not in facts or protocol.requested_region_fact not in facts:
+    elif isinstance(protocol, RegionDecisionProtocol) and (
+        protocol.dataset_class_fact not in facts or protocol.requested_region_fact not in facts
+    ):
         raise OperatorInputError("region reference_run requires unknown world-state facts")
 
 

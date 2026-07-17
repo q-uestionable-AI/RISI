@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "manifest_sha256": "78b77d0a2f640d9cc212da0f9463e5d045f37e8bce48eac813691ab1406d4661",
+  "approved_by": "example-operator",
+  "capabilities": [
+    "scenario.read",
+    "artifact.write",
+    "reference.execute",
+    "evidence.verify"
+  ],
+  "note": "Repository example for the synthetic DAT-02 local-reference baseline."
+}

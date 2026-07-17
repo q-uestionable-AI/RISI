@@ -4,7 +4,9 @@ schema_version: 1
 profile: local-reference
 registered:
   adapter: reference
-  decision_provider: deterministic-approval
+  decision_providers:
+    - deterministic-approval
+    - deterministic-obligation
   memory_policy: pure-read
 capabilities:
   - scenario.read

@@ -32,8 +32,10 @@ from risi.craf import (
     assess_craf_trial,
 )
 from risi.decision import (
+    DecisionProvider,
     DecisionRequest,
     DeterministicApprovalProvider,
+    DeterministicObligationProvider,
     DeterministicRegionProvider,
 )
 from risi.evaluator import DecisionAssessment, MemoryOracle, evaluate_decision
@@ -53,6 +55,7 @@ from risi.models import (
 from risi.operator.models import ApprovalRecord, CommandResult, ResultStatus, RunManifest
 from risi.operator.safety import (
     CRAF_REFERENCE_POLICY,
+    LOCAL_REFERENCE_OBLIGATION_POLICY,
     LOCAL_REFERENCE_POLICY,
     RISI_C_REFERENCE_POLICY,
     AuthorizationDecision,
@@ -61,6 +64,7 @@ from risi.operator.safety import (
     resolve_existing_path,
 )
 from risi.scenarios import (
+    ObligationDecisionProtocol,
     ReferenceRunProtocol,
     RegionDecisionProtocol,
     SyntheticScenario,
@@ -183,6 +187,7 @@ def capabilities_result() -> CommandResult:
     """Return implemented profiles and hard safety boundaries."""
     profiles: list[JsonValue] = [
         LOCAL_REFERENCE_POLICY.to_json(),
+        LOCAL_REFERENCE_OBLIGATION_POLICY.to_json(),
         CRAF_REFERENCE_POLICY.to_json(),
         RISI_C_REFERENCE_POLICY.to_json(),
     ]
@@ -235,9 +240,16 @@ def _validate_risi_c_run_contract(manifest: RunManifest, scenario: SyntheticScen
 def _validate_pure_read_run_contract(manifest: RunManifest, scenario: SyntheticScenario) -> None:
     if scenario.craf_reference is not None or scenario.risi_c_reference is not None:
         raise ValueError("pure-read policy cannot execute an adaptive reference protocol")
-    if not isinstance(scenario.protocol, ReferenceRunProtocol):
-        raise TypeError("pure-read policy requires an approval decision protocol")
-    if scenario.protocol.top_k > manifest.limits.retrieval_calls:
+    protocol = scenario.protocol
+    if isinstance(protocol, ReferenceRunProtocol):
+        expected_provider = DeterministicApprovalProvider().provider_id
+    elif isinstance(protocol, ObligationDecisionProtocol):
+        expected_provider = DeterministicObligationProvider().provider_id
+    else:
+        raise TypeError("pure-read policy requires an approval or obligation decision protocol")
+    if manifest.decision_provider != expected_provider:
+        raise ValueError("pure-read decision provider does not match the scenario protocol")
+    if protocol.top_k > manifest.limits.retrieval_calls:
         raise ValueError("scenario top_k exceeds the approved retrieval_calls limit")
 
 
@@ -362,7 +374,13 @@ def _execute_pure_read(validated: ValidatedRun, artifact_root: Path) -> RunExecu
     )
     retrieval = adapter.retrieve(query)
     context = adapter.assemble_context(retrieval)
-    provider = DeterministicApprovalProvider()
+    provider: DecisionProvider
+    if isinstance(scenario.protocol, ReferenceRunProtocol):
+        provider = DeterministicApprovalProvider()
+    elif isinstance(scenario.protocol, ObligationDecisionProtocol):
+        provider = DeterministicObligationProvider()
+    else:
+        raise TypeError("validated pure-read run has an unsupported decision protocol")
     if provider.provider_id != manifest.decision_provider:
         raise ValueError("registered decision provider does not match the manifest")
     decision = provider.propose(
@@ -905,10 +923,12 @@ def _critical_oracle_applicable(
             == scenario.facts.get(protocol.dataset_class_fact)
             and oracle.applicability.get("prohibited_region") == protocol.prohibited_region
         )
-    return (
-        oracle.applicability.get("environment") == scenario.facts.get("target_environment")
-        and oracle.applicability.get("minimum_approvals") == protocol.minimum_approvals
-    )
+    if isinstance(protocol, ReferenceRunProtocol):
+        return (
+            oracle.applicability.get("environment") == scenario.facts.get("target_environment")
+            and oracle.applicability.get("minimum_approvals") == protocol.minimum_approvals
+        )
+    raise TypeError("craf-reference requires an approval decision protocol")
 
 
 def _optional_memory_by_id(state: StateSnapshot, memory_id: str) -> MemoryRecord | None:

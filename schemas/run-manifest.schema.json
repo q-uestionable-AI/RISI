@@ -31,7 +31,11 @@
     "seed": { "type": "integer", "minimum": 0 },
     "adapter": { "const": "reference" },
     "decision_provider": {
-      "enum": ["deterministic-approval", "deterministic-region"]
+      "enum": [
+        "deterministic-approval",
+        "deterministic-obligation",
+        "deterministic-region"
+      ]
     },
     "policy": { "enum": ["pure-read", "craf-reference", "risi-c-reference"] },
     "capabilities": {
@@ -80,13 +84,24 @@
     },
     {
       "if": {
-        "properties": {
-          "policy": { "enum": ["pure-read", "craf-reference"] }
-        },
+        "properties": { "policy": { "const": "craf-reference" } },
         "required": ["policy"]
       },
       "then": {
         "properties": { "decision_provider": { "const": "deterministic-approval" } }
+      }
+    },
+    {
+      "if": {
+        "properties": { "policy": { "const": "pure-read" } },
+        "required": ["policy"]
+      },
+      "then": {
+        "properties": {
+          "decision_provider": {
+            "enum": ["deterministic-approval", "deterministic-obligation"]
+          }
+        }
       }
     }
   ]

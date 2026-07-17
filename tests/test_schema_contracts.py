@@ -31,6 +31,7 @@ from risi.trace import create_event, event_to_json
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_ROOT = PROJECT_ROOT / "schemas"
 FIXTURE_ROOT = PROJECT_ROOT / "tests" / "fixtures" / "schemas"
+SCENARIO_EXAMPLES = PROJECT_ROOT / "scenarios" / "examples"
 
 
 def _load_json(path: Path) -> dict:
@@ -115,19 +116,91 @@ def test_manifest_schema_binds_each_policy_to_its_registered_decision_provider()
 
     assert set(schema["properties"]["decision_provider"]["enum"]) == {
         "deterministic-approval",
+        "deterministic-obligation",
         "deterministic-region",
     }
     bindings = {
-        tuple(rule["if"]["properties"]["policy"].get("enum", []))
-        or (rule["if"]["properties"]["policy"]["const"],): rule["then"]["properties"][
-            "decision_provider"
-        ]["const"]
+        rule["if"]["properties"]["policy"]["const"]: rule["then"]["properties"]["decision_provider"]
         for rule in schema["allOf"]
     }
     assert bindings == {
-        ("risi-c-reference",): "deterministic-region",
-        ("pure-read", "craf-reference"): "deterministic-approval",
+        "risi-c-reference": {"const": "deterministic-region"},
+        "craf-reference": {"const": "deterministic-approval"},
+        "pure-read": {
+            "enum": ["deterministic-approval", "deterministic-obligation"],
+        },
     }
+
+
+def test_scenario_schema_contains_closed_obligation_protocol_variant() -> None:
+    schema = _load_json(SCHEMA_ROOT / "scenario.schema.json")
+    obligation = schema["$defs"]["obligationReferenceRun"]
+    expected = {
+        "principal_id",
+        "tenant_id",
+        "query",
+        "top_k",
+        "required_memory_id",
+        "action_if_present",
+        "action_if_absent",
+    }
+
+    assert obligation["additionalProperties"] is False
+    assert set(obligation["required"]) == expected
+    assert set(obligation["properties"]) == expected
+    assert {"$ref": "#/$defs/obligationReferenceRun"} in schema["$defs"]["referenceRun"]["oneOf"]
+
+
+def test_ten_scenario_bundle_matches_closed_schema_shapes() -> None:
+    schema = _load_json(SCHEMA_ROOT / "scenario.schema.json")
+    paths = (
+        SCENARIO_EXAMPLES / "dep-01-pure-read.json",
+        SCENARIO_EXAMPLES / "dep-02-risi-c.json",
+        *sorted(
+            path
+            for path in SCENARIO_EXAMPLES.glob("*-pure-read.json")
+            if path.name != "dep-01-pure-read.json"
+        ),
+    )
+    protocol_defs = (
+        schema["$defs"]["approvalReferenceRun"],
+        schema["$defs"]["obligationReferenceRun"],
+        schema["$defs"]["regionReferenceRun"],
+    )
+    memory_schema = schema["$defs"]["memory"]
+
+    assert len(paths) == 10
+    assert {(_load_json(path)["scenario_id"]) for path in paths} == {
+        "DEP-01",
+        "DEP-02",
+        "DEP-03",
+        "DAT-01",
+        "DAT-02",
+        "MED-01",
+        "MED-02",
+        "FIN-01",
+        "IAM-01",
+        "IAM-02",
+    }
+    for path in paths:
+        scenario = _load_json(path)
+        assert set(schema["required"]) <= set(scenario) <= set(schema["properties"])
+        assert scenario["domain"] in schema["properties"]["domain"]["enum"]
+        assert scenario["phenomenon"] in schema["properties"]["phenomenon"]["enum"]
+        protocol = scenario["reference_run"]
+        assert (
+            sum(
+                set(protocol)
+                == set(protocol_schema["required"])
+                == set(protocol_schema["properties"])
+                for protocol_schema in protocol_defs
+            )
+            == 1
+        )
+        for memory in scenario["initial_memories"]:
+            assert set(memory_schema["required"]) <= set(memory) <= set(memory_schema["properties"])
+        if scenario["phenomenon"] == "combined":
+            assert {"risi", "craf"} <= set(scenario)
 
 
 def test_valid_event_fixture_matches_canonical_python_contract() -> None:

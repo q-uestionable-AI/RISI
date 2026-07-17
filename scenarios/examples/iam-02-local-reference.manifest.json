@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "run_id": "iam-02-local-reference",
+  "profile": "local-reference",
+  "scenario_path": "examples/iam-02-pure-read.json",
+  "scenario_sha256": "d10f915961b75d0f893f3bc5adc0ca38463542939ccbd0c21660f56f371c6b37",
+  "seed": 1805359029,
+  "adapter": "reference",
+  "decision_provider": "deterministic-obligation",
+  "policy": "pure-read",
+  "capabilities": [
+    "scenario.read",
+    "artifact.write",
+    "reference.execute",
+    "evidence.verify"
+  ],
+  "limits": {
+    "episodes": 1,
+    "retrieval_calls": 4,
+    "logical_steps": 20,
+    "input_bytes": 100000,
+    "memory_records": 100,
+    "artifact_bytes": 2000000
+  }
+}

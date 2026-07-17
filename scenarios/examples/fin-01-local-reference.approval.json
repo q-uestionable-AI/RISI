@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "manifest_sha256": "3a9e3f4edba69c2b2d4dc4e6661e164e70ffe584b4232a7df9b7c5397ee4307b",
+  "approved_by": "example-operator",
+  "capabilities": [
+    "scenario.read",
+    "artifact.write",
+    "reference.execute",
+    "evidence.verify"
+  ],
+  "note": "Repository example for the synthetic FIN-01 local-reference baseline."
+}

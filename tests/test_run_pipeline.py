@@ -17,6 +17,8 @@ SCENARIO_ROOT = PROJECT_ROOT / "scenarios"
 EXAMPLES = SCENARIO_ROOT / "examples"
 MANIFEST = EXAMPLES / "dep-01-local-reference.manifest.json"
 APPROVAL = EXAMPLES / "dep-01-local-reference.approval.json"
+OBLIGATION_MANIFEST = EXAMPLES / "dat-01-local-reference.manifest.json"
+OBLIGATION_APPROVAL = EXAMPLES / "dat-01-local-reference.approval.json"
 runner = CliRunner()
 
 
@@ -145,9 +147,31 @@ def test_validate_rejects_region_protocol_before_pure_read_execution(
         lambda *args, **kwargs: replace(scenario, protocol=region_protocol),
     )
 
-    with pytest.raises(TypeError, match="approval decision protocol"):
+    with pytest.raises(TypeError, match="approval or obligation decision protocol"):
         validate_run(
             load_run_manifest(MANIFEST),
             load_approval_record(APPROVAL),
             SCENARIO_ROOT,
         )
+
+
+@pytest.mark.parametrize(
+    ("manifest_path", "approval_path", "wrong_provider"),
+    (
+        (MANIFEST, APPROVAL, "deterministic-obligation"),
+        (OBLIGATION_MANIFEST, OBLIGATION_APPROVAL, "deterministic-approval"),
+    ),
+)
+def test_pure_read_protocol_is_bound_to_its_registered_provider(
+    manifest_path: Path,
+    approval_path: Path,
+    wrong_provider: str,
+) -> None:
+    manifest = replace(load_run_manifest(manifest_path), decision_provider=wrong_provider)
+    approval = replace(
+        load_approval_record(approval_path),
+        manifest_sha256=manifest.digest,
+    )
+
+    with pytest.raises(ValueError, match="does not match the scenario protocol"):
+        validate_run(manifest, approval, SCENARIO_ROOT)
