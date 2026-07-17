@@ -3,7 +3,7 @@
   "run_id": "iam-01-local-reference",
   "profile": "local-reference",
   "scenario_path": "examples/iam-01-pure-read.json",
-  "scenario_sha256": "4a752241482ae51316e345a0afa368f968e2c1d43405a546938477a022ab0ad0",
+  "scenario_sha256": "5c874a2589d0ca8f3c8f0431d02d402ecabaf941f43c0ca302f31ad296b8f1e8",
   "seed": 1982082443,
   "adapter": "reference",
   "decision_provider": "deterministic-obligation",

@@ -3,7 +3,7 @@
   "run_id": "fin-01-local-reference",
   "profile": "local-reference",
   "scenario_path": "examples/fin-01-pure-read.json",
-  "scenario_sha256": "e625859d242af0c20a4620f78171f7494ec17b175b1628851b952c2c476997cd",
+  "scenario_sha256": "2295fbf83983110e1a7e90ac2d3ca34f0141f05d99537622f0f690ee9686a7b0",
   "seed": 1015228022,
   "adapter": "reference",
   "decision_provider": "deterministic-obligation",

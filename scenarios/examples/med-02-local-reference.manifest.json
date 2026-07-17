@@ -3,7 +3,7 @@
   "run_id": "med-02-local-reference",
   "profile": "local-reference",
   "scenario_path": "examples/med-02-pure-read.json",
-  "scenario_sha256": "493b59ccc6aed4af4d31380f910dc7ab8bf3f49cb18ea96ca764e3bd65852aee",
+  "scenario_sha256": "fd3cde2ffa627d400c9232262a536040ae67a6489f41ba61180477cc5df7f63f",
   "seed": 1243577064,
   "adapter": "reference",
   "decision_provider": "deterministic-obligation",

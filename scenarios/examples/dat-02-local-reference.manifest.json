@@ -3,7 +3,7 @@
   "run_id": "dat-02-local-reference",
   "profile": "local-reference",
   "scenario_path": "examples/dat-02-pure-read.json",
-  "scenario_sha256": "fff951d4fc9ca8ab9f5444d09ef1105e5511423611af2b4040fd34d851b70bcd",
+  "scenario_sha256": "9fd7e2b3805bc4040ffe375b5cca3994f0bbbc49161748efd1b9bd303d14e820",
   "seed": 988285927,
   "adapter": "reference",
   "decision_provider": "deterministic-obligation",

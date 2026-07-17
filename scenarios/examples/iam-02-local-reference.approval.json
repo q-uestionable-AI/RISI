@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "manifest_sha256": "e7ec6898e4cfc2880cd9950f212c0d59f38dcfd3f0518c10491b8176af5725c0",
+  "manifest_sha256": "0b031e73218c21fc581d1ade74dbd9a9c118687e31d1e85f6ae99643c43429ff",
   "approved_by": "example-operator",
   "capabilities": [
     "scenario.read",
