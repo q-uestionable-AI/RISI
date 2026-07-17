@@ -9,7 +9,7 @@
   "properties": {
     "schema_version": { "const": 1 },
     "command": { "type": "string", "minLength": 1 },
-    "status": { "enum": ["ok", "error", "blocked"] },
+    "status": { "enum": ["ok", "error", "blocked", "resource_exhausted", "interrupted"] },
     "run_id": { "type": ["string", "null"] },
     "data": { "$ref": "#/$defs/jsonObject" },
     "errors": {

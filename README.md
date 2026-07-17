@@ -43,8 +43,13 @@ RISI-C comparison. It includes:
   decision-use localization;
 - an observer-only RISI-C evidence contract, frozen classifier, paired pure-read ablation, and
   sole-mediator proof for `/derived_state/shared_access_counter`;
-- atomic evidence bundles, integrity verification, model-free replay, and generated reports;
-- stable text and JSON CLI output for human or autonomous operation.
+- atomic evidence bundles, verified inspection and comparison, model-free replay, and generated
+  reports;
+- deterministic accounting for episodes, retrieval calls, logical steps, scenario bytes, memory
+  records, and complete bundle bytes;
+- idempotent re-invocation of verified completed runs and fail-closed handling of incomplete,
+  changed, or tampered final paths;
+- stable text and JSON CLI output for the synchronous human or autonomous A1 workflow.
 
 It does **not** implement an external attack, external inference integration, database,
 consequential action, or external vulnerability finding. The controlled vulnerable policy is a
@@ -79,6 +84,7 @@ uv run risi capabilities --format json
 uv run risi validate scenarios/examples/dep-01-local-reference.manifest.json --approval scenarios/examples/dep-01-local-reference.approval.json --scenario-root scenarios
 uv run risi run scenarios/examples/dep-01-local-reference.manifest.json --approval scenarios/examples/dep-01-local-reference.approval.json --scenario-root scenarios --artifact-root artifacts
 uv run risi verify artifacts/dep-01-local-reference
+uv run risi inspect artifacts/dep-01-local-reference --format json
 uv run risi replay artifacts/dep-01-local-reference
 uv run risi report artifacts/dep-01-local-reference
 ```
@@ -87,6 +93,11 @@ The manifest binds the exact scenario-file digest, and the example approval bind
 manifest digest. Approval records provide auditable provenance and change detection, not
 authentication. Stronger deployments must protect or sign approvals outside an agent's execution
 context.
+
+`risi compare <bundle-a> <bundle-b> --format json` verifies both bundles before reporting exact
+equality or stable differing evidence paths and semantic anchors. Re-running the same approved
+manifest against a complete verified final bundle returns its existing anchor with `reused: true`;
+it never overwrites an incomplete, changed, or tampered final path.
 
 ## Run the controlled CRAF comparison
 
@@ -129,6 +140,9 @@ enforces profile, capability, budget, approval, and path controls below the CLI.
 profile denies network access, subprocesses, credentials, dynamic plugins, and source-memory
 writes by construction. Its controlled adaptive policies may change only explicitly recorded
 derived state. Host or network isolation remains necessary when future external adapters are used.
+The implemented A1 lifecycle is one synchronous process with cooperative interruption and zero
+automatic retries. It exposes no status service, cancel command, asynchronous jobs, or wall-clock
+experimental deadline; `risi capabilities --format json` advertises those hard denials.
 Any future remote inference profile must bind approval to an exact endpoint, model, non-secret
 credential alias, generation parameters, network class, and request, token, time, retry, and spend
 ceilings while retaining redacted request and response evidence.

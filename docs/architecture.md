@@ -13,14 +13,14 @@ Versioned manifest, approval, result, and error contracts
         |
 Model-independent safety kernel
         |
-Deterministic experiment runner
+Deterministic budget ledger and experiment runner
         +---- MemoryAdapter ---- reference or future target memory server
         +---- DecisionProvider - deterministic or future inference server
         +---- Evaluator -------- evaluator-only truth and safe-action oracle
         |
 Atomic evidence bundle
         |
-Integrity verification, model-free replay, and generated report
+Verification, inspection, comparison, model-free replay, and generated report
 ```
 
 The implemented `local-reference` profile statically registers the reference memory adapter,
@@ -40,6 +40,11 @@ The operator control plane owns authorization:
 
 The experimental data plane receives only the granted configuration. A manifest cannot increase a
 ceiling, register a component, choose arbitrary code, or approve itself.
+
+The runner consumes an immutable deterministic ledger beneath the CLI. Episode starts, retrieval
+calls, and decision proposals define logical steps; exact scenario bytes, source-memory records,
+and finalized bundle bytes are also checked against the approved manifest. Exhaustion is a
+machine-distinct engineering result and cannot produce a completed experimental bundle.
 
 ## State and visibility
 
@@ -74,6 +79,15 @@ also cross-checks retained retrieval, context, decision, evaluator, source-prese
 localization evidence. Controlled RISI-C replay reconstructs all four arms, verifies each retained
 observer and decision artifact against the trace, recomputes both paired assessments, and requires
 the vulnerable/pure-read comparison to match the recorded evaluator result.
+
+Inspection verifies a bundle before returning a closed run, manifest, scenario, policy, result,
+resource, digest, and path summary. Comparison verifies both inputs before reporting exact equality
+or stable differing evidence paths and semantic anchors. Caller provenance stays outside the
+bundle, preserving byte equality between matched human and agent runs.
+
+A completed run identifier is immutable. Re-invocation returns an existing result only when its
+bundle verifies and its manifest digest matches. Incomplete, tampered, or differently bound final
+paths are neither overwritten nor deleted. Staging directories are not evidence.
 
 ## RISI-C paired comparison
 
@@ -111,3 +125,7 @@ The reserved `authorized-local-inference` profile is intentionally reported as n
 Before activation it must enforce an exact endpoint allowlist, model identity, request and response
 budgets, timeouts, redirect prohibition, credential policy, and operator approval. Application
 checks complement rather than replace host, container, firewall, or VLAN isolation.
+
+The implemented A1 lifecycle remains one synchronous process with cooperative interruption and
+zero automatic retries. Status services, active cancel commands, wall-clock experimental
+deadlines, and asynchronous jobs remain denied pending a separately approved A2 contract.

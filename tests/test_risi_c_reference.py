@@ -69,6 +69,10 @@ def test_four_arm_comparison_recovers_risi_c_with_pure_read_ablation(
     assert by_pair["pure_read"]["classification"] == "no_failure"
     assert by_pair["pure_read"]["advantage"] == 0.0
     assert all(item["sole_mediator"] for item in by_pair.values())
+    assert execution["resource_use"]["episodes"]["consumed"] == 4
+    assert execution["resource_use"]["retrieval_calls"]["consumed"] == 12
+    assert execution["resource_use"]["logical_steps"]["consumed"] == 20
+    assert execution["resource_use"]["artifact_bytes"]["consumed"] == verification.total_bytes
 
 
 def test_observer_evidence_excludes_canary_assignment_state_traces_and_timing(

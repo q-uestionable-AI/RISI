@@ -25,7 +25,13 @@ from risi.models import (
     StateSnapshot,
     TraceEventDraft,
 )
-from risi.operator.models import ApprovalRecord, CommandResult, ExecutionLimits, RunManifest
+from risi.operator.models import (
+    ApprovalRecord,
+    CommandResult,
+    ExecutionLimits,
+    ResultStatus,
+    RunManifest,
+)
 from risi.trace import create_event, event_to_json
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -109,6 +115,10 @@ def test_operator_schema_fields_match_python_contracts() -> None:
 
     limits_schema = _load_json(SCHEMA_ROOT / "run-manifest.schema.json")["properties"]["limits"]
     assert set(limits_schema["required"]) == {field.name for field in fields(ExecutionLimits)}
+    result_schema = _load_json(SCHEMA_ROOT / "result.schema.json")
+    assert set(result_schema["properties"]["status"]["enum"]) == {
+        status.value for status in ResultStatus
+    }
 
 
 def test_manifest_schema_binds_each_policy_to_its_registered_decision_provider() -> None:

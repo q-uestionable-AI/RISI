@@ -12,19 +12,24 @@ Versioned machine contracts
         |
 Model-independent safety kernel
         |
-Deterministic runner
+Deterministic budget ledger and runner
         +---- MemoryAdapter
         +---- DecisionProvider
         +---- Evaluator-only oracle
         |
 Atomic evidence bundle
         |
-Verify, replay, and report
+Verify, inspect, compare, replay, and report
 ```
 
 The `local-reference` profile permits only registered deterministic components. Network access,
 subprocesses, credentials, dynamic plugins, and source-memory writes are denied. Closed reference
 policies may change only explicitly recorded derived state.
+
+The immutable ledger checks each episode start, retrieval call, and decision proposal as a
+deterministic logical step. It also accounts for exact scenario bytes, source-memory records, and
+the finalized bundle including its inventory. Exhaustion stops before atomic finalization and
+cannot enter experimental scoring.
 
 ## Visibility boundary
 
@@ -48,6 +53,15 @@ to equal its recorded final snapshot. For the CRAF comparison it also checks ret
 context, decision, evaluator, source-preservation, and localization evidence without invoking a
 model. For RISI-C it reconstructs all four arms, verifies retained observer and decision artifacts,
 and recomputes the vulnerable and pure-read assessments.
+
+Inspection and comparison are read-only evidence services. Inspection verifies integrity before
+returning closed semantic anchors and inventory paths. Comparison verifies both bundles before
+reporting exact digest equality or stable differing paths and anchors. The caller identity is not
+part of bundle material, so deterministic manual and agent runs can compare byte-for-byte.
+
+Completed run identifiers are immutable. Re-invocation may reuse only a verified bundle with the
+same manifest digest; incomplete, tampered, or differently bound final paths fail closed. Temporary
+staging directories are never completed evidence.
 
 ## Controlled CRAF comparison
 
@@ -80,3 +94,7 @@ The repository implements the DEP-01 pure-read baseline, one intentionally contr
 CRAF mechanism with a protected control, and one controlled DEP-02 RISI-C mechanism with a
 pure-read ablation. External adapters, executable inference profiles, live targets, autonomous
 campaigns, and statistical or external vulnerability claims remain gated future work.
+
+The A1 process model is synchronous with zero automatic retries and cooperative interruption. It
+does not expose a status service, cancel command, wall-clock experimental deadline, or asynchronous
+job surface.

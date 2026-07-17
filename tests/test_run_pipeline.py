@@ -6,6 +6,7 @@ import pytest
 from typer.testing import CliRunner
 
 from risi.artifacts import ArtifactError, verify_evidence_bundle
+from risi.budget import BudgetExhaustedError
 from risi.cli import app
 from risi.operator.models import load_approval_record, load_run_manifest
 from risi.replay import read_verified_report, replay_bundle
@@ -78,10 +79,172 @@ def test_cli_exposes_stable_json_run_verify_and_replay(tmp_path: Path) -> None:
     assert run_payload["status"] == "ok"
     bundle = Path(run_payload["data"]["bundle_path"])
 
-    for command in ("verify", "replay"):
+    for command in ("verify", "inspect", "replay"):
         result = runner.invoke(app, [command, str(bundle), "--format", "json"])
         assert result.exit_code == 0, result.stdout
         assert json.loads(result.stdout)["status"] == "ok"
+
+    comparison = runner.invoke(
+        app,
+        ["compare", str(bundle), str(bundle), "--format", "json"],
+    )
+    assert comparison.exit_code == 0, comparison.stdout
+    assert json.loads(comparison.stdout)["data"]["equal"] is True
+
+
+def test_cli_reinvocation_returns_reused_verified_result(tmp_path: Path) -> None:
+    arguments = [
+        "run",
+        str(MANIFEST),
+        "--approval",
+        str(APPROVAL),
+        "--scenario-root",
+        str(SCENARIO_ROOT),
+        "--artifact-root",
+        str(tmp_path),
+        "--format",
+        "json",
+    ]
+
+    first = runner.invoke(app, arguments)
+    second = runner.invoke(app, arguments)
+
+    assert first.exit_code == second.exit_code == 0
+    first_payload = json.loads(first.stdout)
+    second_payload = json.loads(second.stdout)
+    assert first_payload["data"]["reused"] is False
+    assert second_payload["data"]["reused"] is True
+    assert first_payload["data"]["bundle_hash"] == second_payload["data"]["bundle_hash"]
+
+
+def test_budget_exhaustion_has_distinct_machine_result_and_no_bundle(tmp_path: Path) -> None:
+    manifest = replace(
+        load_run_manifest(MANIFEST),
+        limits=replace(load_run_manifest(MANIFEST).limits, logical_steps=2),
+    )
+    approval = replace(
+        load_approval_record(APPROVAL),
+        manifest_sha256=manifest.digest,
+    )
+    manifest_path = tmp_path / "manifest.json"
+    approval_path = tmp_path / "approval.json"
+    manifest_path.write_text(json.dumps(manifest.to_json()), encoding="utf-8")
+    approval_path.write_text(json.dumps(approval.to_json()), encoding="utf-8")
+    artifact_root = tmp_path / "artifacts"
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            str(manifest_path),
+            "--approval",
+            str(approval_path),
+            "--scenario-root",
+            str(SCENARIO_ROOT),
+            "--artifact-root",
+            str(artifact_root),
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 6, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "resource_exhausted"
+    assert payload["errors"][0]["code"] == "budget_exhausted"
+    assert payload["data"]["exhaustion"]["resource"] == "logical_steps"
+    assert not (artifact_root / manifest.run_id).exists()
+
+
+def test_service_budget_exhaustion_is_not_an_experimental_result(tmp_path: Path) -> None:
+    manifest = replace(
+        load_run_manifest(MANIFEST),
+        limits=replace(load_run_manifest(MANIFEST).limits, logical_steps=2),
+    )
+    approval = replace(load_approval_record(APPROVAL), manifest_sha256=manifest.digest)
+
+    with pytest.raises(BudgetExhaustedError):
+        run_guarded(manifest, approval, SCENARIO_ROOT, tmp_path)
+
+    assert not (tmp_path / manifest.run_id).exists()
+
+
+def test_artifact_budget_covers_inventory_and_prevents_finalization(tmp_path: Path) -> None:
+    manifest = replace(
+        load_run_manifest(MANIFEST),
+        limits=replace(load_run_manifest(MANIFEST).limits, artifact_bytes=1),
+    )
+    approval = replace(load_approval_record(APPROVAL), manifest_sha256=manifest.digest)
+
+    with pytest.raises(BudgetExhaustedError) as raised:
+        run_guarded(manifest, approval, SCENARIO_ROOT, tmp_path)
+
+    assert raised.value.resource.value == "artifact_bytes"
+    assert not (tmp_path / manifest.run_id).exists()
+
+
+def test_cooperative_interruption_has_distinct_exit_and_no_bundle(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def interrupt(*args, **kwargs) -> None:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr("risi.cli.run_guarded", interrupt)
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            str(MANIFEST),
+            "--approval",
+            str(APPROVAL),
+            "--scenario-root",
+            str(SCENARIO_ROOT),
+            "--artifact-root",
+            str(tmp_path),
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 130, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "interrupted"
+    assert payload["errors"][0]["code"] == "interrupted"
+    assert not (tmp_path / "dep-01-local-reference").exists()
+
+
+def test_interrupt_after_atomic_finalization_recovers_completed_result(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def complete_then_interrupt(*args, **kwargs) -> None:
+        run_guarded(*args, **kwargs)
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr("risi.cli.run_guarded", complete_then_interrupt)
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            str(MANIFEST),
+            "--approval",
+            str(APPROVAL),
+            "--scenario-root",
+            str(SCENARIO_ROOT),
+            "--artifact-root",
+            str(tmp_path),
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "ok"
+    assert payload["data"]["reused"] is True
+    assert (tmp_path / "dep-01-local-reference" / "inventory.json").is_file()
 
 
 def test_cli_returns_policy_exit_code_for_unapproved_manifest(tmp_path: Path) -> None:
