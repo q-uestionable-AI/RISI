@@ -1,4 +1,4 @@
-# RISI Research Harness
+# RISI
 
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
 [![CI](https://github.com/q-uestionable-AI/RISI/actions/workflows/ci.yml/badge.svg)](https://github.com/q-uestionable-AI/RISI/actions/workflows/ci.yml)
@@ -8,9 +8,9 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Docs](https://img.shields.io/badge/docs-risi.q--uestionable.ai-8b5cf6)](https://risi.q-uestionable.ai)
 
-RISI is an agent-operable, human-governed security research harness for studying
-**Retrieval-Induced State Interference** and **Critical Recall Availability Failure** in
-persistent AI-agent memory.
+RISI is a Python library and command-line tool for deterministic experiments about
+retrieval-related changes in persistent AI-agent memory. The current implementation runs
+synthetic reference scenarios; it does not test external systems.
 
 The project distinguishes:
 
@@ -27,41 +27,30 @@ Failure (CAAF) remains a separate exploratory admission-stage phenomenon and is 
 
 ## Status
 
-The repository implements guarded deterministic reference paths for the synthetic DEP-01
-pure-read baseline, a controlled three-arm CRAF comparison, and a controlled four-arm DEP-02
-RISI-C comparison. It includes:
+Version 0.1.0 provides:
 
-- strict run, approval, scenario, result, event, state, and evidence contracts;
-- a model-independent `local-reference` safety profile;
-- authorized deterministic retrieval and a transport-neutral, replaceable decision-provider
-  boundary;
-- structurally separated target-visible and evaluator-only state;
-- full-state snapshots and hash-chained event telemetry;
-- an intentionally vulnerable memory-eclipsing policy and a protected-critical-recall control,
-  both limited to the deterministic synthetic reference profile;
-- evaluator-only CRAF classification, source-preservation proof, and retrieval/presentation/
-  decision-use localization;
-- an observer-only RISI-C evidence contract, frozen classifier, paired pure-read ablation, and
-  sole-mediator proof for `/derived_state/shared_access_counter`;
-- atomic evidence bundles, verified inspection and comparison, model-free replay, and generated
-  reports;
-- deterministic accounting for episodes, retrieval calls, logical steps, scenario bytes, memory
-  records, and complete bundle bytes;
-- idempotent re-invocation of verified completed runs and fail-closed handling of incomplete,
-  changed, or tampered final paths;
-- stable text and JSON CLI output for the synchronous human or autonomous A1 workflow.
+- JSON schemas for runs, approvals, scenarios, results, events, state, and evidence;
+- a deterministic `local-reference` profile with no model or network access;
+- separate target-visible and evaluator-only state;
+- state snapshots and hash-linked event records;
+- a three-arm synthetic CRAF reference comparison;
+- a four-arm synthetic RISI-C reference comparison;
+- evidence-bundle verification, inspection, replay, comparison, and report generation;
+- limits for episodes, retrieval calls, logical steps, scenario bytes, memory records, and bundle
+  bytes; and
+- text and JSON output from the synchronous CLI.
 
-It does **not** implement an external attack, external inference integration, database,
-consequential action, or external vulnerability finding. The controlled vulnerable policy is a
-deliberately synthetic reference mechanism, not evidence about another system. The authoritative
-charter and project governance remain outside this repository in a private governance vault.
-Research records and evidence live separately in a private Lab research workspace. Governed local
-work locates them through operator-configured `RISI_VAULT_ROOT` and `RISI_RESEARCH_ROOT` values;
-neither private location is part of the public package interface.
+The reference comparisons include intentionally vulnerable and protected synthetic policies. Their
+results describe those fixtures only and are not evidence about another system.
 
-Capability discovery reserves separate local/lab and remote public-HTTPS inference profiles for
-future, separately approved work. Both remain non-executable: they grant no networking,
-credentials, adapter registration, or model access in the implemented `local-reference` profile.
+The repository does not implement an external attack, external inference, a database, or a
+connection to consequential systems. Project governance is kept in a private governance vault;
+research records and evidence are kept in a separate private Lab workspace. Local project tooling
+locates them through `RISI_VAULT_ROOT` and `RISI_RESEARCH_ROOT`. Those locations are not part of the
+public package interface.
+
+Capability output lists reserved local/lab and remote HTTPS inference profiles. They are marked
+`not-implemented` and do not enable networking, credentials, adapters, or model access.
 
 ## Install
 
@@ -73,8 +62,8 @@ risi --version
 risi capabilities --format json
 ```
 
-The distribution provides the RISI library and CLI. The bundled DEP-01 and DEP-02 scenarios,
-manifests, and approvals are repository examples, so clone the source tree to run them.
+The package provides the RISI library and CLI. DEP-01 and DEP-02 scenarios, manifests, and
+approvals are repository examples, so clone the repository to run them.
 
 ## Run the source example
 
@@ -91,15 +80,14 @@ uv run risi replay artifacts/dep-01-local-reference
 uv run risi report artifacts/dep-01-local-reference
 ```
 
-The manifest binds the exact scenario-file digest, and the example approval binds the exact
-manifest digest. Approval records provide auditable provenance and change detection, not
-authentication. Stronger deployments must protect or sign approvals outside an agent's execution
-context.
+The manifest includes the scenario-file digest, and the example approval includes the manifest
+digest. Approval files record who approved an example and allow change detection; they do not
+authenticate an operator.
 
-`risi compare <bundle-a> <bundle-b> --format json` verifies both bundles before reporting exact
-equality or stable differing evidence paths and semantic anchors. Re-running the same approved
-manifest against a complete verified final bundle returns its existing anchor with `reused: true`;
-it never overwrites an incomplete, changed, or tampered final path.
+`risi compare <bundle-a> <bundle-b> --format json` verifies both bundles before reporting equality
+or differing evidence paths and semantic anchors. Re-running the same approved manifest against a
+complete verified final bundle returns its existing anchor with `reused: true`. The command rejects
+an incomplete, changed, or invalid final path instead of overwriting it.
 
 ## Run the controlled CRAF comparison
 
@@ -110,10 +98,10 @@ uv run risi replay artifacts/dep-01-craf-reference
 uv run risi report artifacts/dep-01-craf-reference
 ```
 
-This run resets control, memory-eclipsing, and protected-critical-recall arms from one canonical
-snapshot. It records a controlled mechanism as recovered only when the control is safe, the
-vulnerable arm produces retrieval-stage core CRAF without changing the critical source, and the
-protected arm remains safe.
+This run starts control, memory-eclipsing, and protected-critical-recall arms from the same
+snapshot. The report marks the reference condition as recovered only when the control remains safe,
+the vulnerable arm meets the retrieval-stage CRAF criteria without changing the critical source,
+and the protected arm remains safe.
 
 ## Run the controlled RISI-C comparison
 
@@ -124,12 +112,12 @@ uv run risi replay artifacts/dep-02-risi-c-reference
 uv run risi report artifacts/dep-02-risi-c-reference
 ```
 
-This run resets vulnerable sham, vulnerable hidden-retrieval, pure-read sham, and pure-read
-hidden-retrieval arms from one canonical snapshot. The observer evidence contains only its own
-authorized query, response, and result count. The controlled mechanism is recovered only when the
-vulnerable pair has advantage `0.5`, the pure-read ablation has advantage `0.0`, the canary remains
-absent from both observer views, and the shared access counter is the sole vulnerable-pair state
-mediator. Every region decision remains safe.
+This run starts vulnerable sham, vulnerable hidden-retrieval, pure-read sham, and pure-read
+hidden-retrieval arms from the same snapshot. Observer evidence contains its query, response, and
+result count. The report marks the reference condition as recovered only when the vulnerable pair
+has advantage `0.5`, the pure-read pair has advantage `0.0`, the canary is absent from both observer
+views, `/derived_state/shared_access_counter` is the only differing shared-state field in the
+vulnerable pair, and every region decision remains safe.
 
 ## Safety boundary
 
@@ -137,17 +125,18 @@ RISI uses synthetic scenarios and lab-controlled or explicitly authorized system
 outputs are proposals and must never be connected to live medical, financial, deployment,
 identity, access-control, or other consequential production systems.
 
-All models—including an orchestrating model—are treated as untrusted callers. The safety kernel
-enforces profile, capability, budget, approval, and path controls below the CLI. The implemented
-profile denies network access, subprocesses, credentials, dynamic plugins, and source-memory
-writes by construction. Its controlled adaptive policies may change only explicitly recorded
-derived state. Host or network isolation remains necessary when future external adapters are used.
-The implemented A1 lifecycle is one synchronous process with cooperative interruption and zero
-automatic retries. It exposes no status service, cancel command, asynchronous jobs, or wall-clock
-experimental deadline; `risi capabilities --format json` advertises those hard denials.
-Any future remote inference profile must bind approval to an exact endpoint, model, non-secret
-credential alias, generation parameters, network class, and request, token, time, retry, and spend
-ceilings while retaining redacted request and response evidence.
+All models, including an orchestrating model, are treated as untrusted callers. The safety kernel
+checks the selected profile, capabilities, budgets, approval, and paths below the CLI. The
+`local-reference` profile rejects network access, subprocesses, credentials, dynamic plugins, and
+source-memory writes. Its adaptive policies write only the derived-state fields defined by the
+profile.
+
+The current lifecycle runs in one synchronous process with cooperative interruption and zero
+automatic retries. It has no status service, cancel command, asynchronous jobs, or wall-clock
+experimental deadline. `risi capabilities --format json` reports these constraints.
+
+External adapters are not implemented. Any later adapter would require separate approval, host or
+network isolation, bounded credentials and resources, and redacted request and response records.
 
 ## Development and documentation
 
