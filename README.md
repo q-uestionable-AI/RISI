@@ -54,8 +54,10 @@ RISI-C comparison. It includes:
 It does **not** implement an external attack, external inference integration, database,
 consequential action, or external vulnerability finding. The controlled vulnerable policy is a
 deliberately synthetic reference mechanism, not evidence about another system. The authoritative
-research charter and research evidence remain outside this repository in the private research
-vault.
+charter and project governance remain outside this repository in a private governance vault.
+Research records and evidence live separately in a private Lab research workspace. Governed local
+work locates them through operator-configured `RISI_VAULT_ROOT` and `RISI_RESEARCH_ROOT` values;
+neither private location is part of the public package interface.
 
 Capability discovery reserves separate local/lab and remote public-HTTPS inference profiles for
 future, separately approved work. Both remain non-executable: they grant no networking,

@@ -4,17 +4,20 @@ Repository-local instructions for coding agents. Do not create a parallel agent-
 
 RISI is a pre-experimental security research project for Retrieval-Induced State Interference
 (RISI), RISI confidentiality failures (RISI-C), and Critical Recall Availability Failure (CRAF).
-The authoritative research charter is maintained separately in the private research vault and
-must never be copied into this repository.
+The authoritative research charter and project governance are maintained separately in a private
+governance vault. Research records and artifacts are maintained in a separate private Lab research
+workspace. Neither may be copied into this repository.
 
-## Private vault ops
+## Private workspace ops
 
 Session sequence, boards, and research gates are governed by a private mode card configured
 outside this repository. The operator must set `RISI_VAULT_ROOT` to the private research-vault
 root. Read `RISI/Project Instructions.md` beneath that root and keep the active plan, boards, and
 vault-root `Project-Status.md` current per its session habit. If the configured location is
-unavailable, stop and request it from the operator. Do not copy private charter or research
-evidence into this repository.
+unavailable, stop and request it from the operator. Research records and artifacts live beneath
+the separately operator-configured `RISI_RESEARCH_ROOT`; request that location when the task
+requires M0/M1 records or evidence. Do not treat the governance and research roots as
+interchangeable, and do not copy private charter or research material into this repository.
 
 ## Operating mode
 
@@ -46,7 +49,8 @@ evidence into this repository.
   already approved outcome.
 - Verify repository behavior rather than relying on memory.
 - Do not add dependencies without explicit approval.
-- Keep research evidence, unpublished traces, findings, and publication drafts outside this repo.
+- Keep research evidence, unpublished traces, findings, and publication drafts outside this repo
+  under the operator-configured `RISI_RESEARCH_ROOT`.
 - Build the complete, coherent, proportionate solution needed for the approved outcome. Do not
   reduce correctness, safety, verification, or documentation merely to minimize a change set.
 

@@ -2,7 +2,8 @@
 
 This is a public implementation summary, not the research plan. The authoritative charter,
 session-to-session plan, evidence gates, and spending decisions remain in the private research
-vault.
+governance vault. Research records and evidence live separately in the private Lab research
+workspace configured by the operator.
 
 ## Implemented
 
