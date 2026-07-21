@@ -40,16 +40,21 @@ def test_smoke_command() -> None:
     assert result.stdout.strip() == "risi smoke: ok"
 
 
-def test_capabilities_reserve_remote_inference_without_enabling_it() -> None:
+def test_capabilities_expose_closed_dify_profile_and_reserve_inference_profiles() -> None:
     result = runner.invoke(app, ["capabilities", "--format", "json"])
 
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
     implemented = {profile["profile"]: profile for profile in payload["data"]["profiles"]}
     reserved = {profile["profile"]: profile for profile in payload["data"]["future_profiles"]}
-    assert set(implemented) == {"local-reference"}
+    assert set(implemented) == {"local-reference", "isolated-dify-knowledge"}
     assert implemented["local-reference"]["network"] == "denied"
     assert implemented["local-reference"]["credentials"] == "denied"
+    dify = implemented["isolated-dify-knowledge"]
+    assert dify["network"] == "one-frozen-target"
+    assert dify["credentials"] == "fingerprint-bound-secret-file"
+    assert dify["request_timeout_seconds"] == 10
+    assert dify["automatic_retry_count"] == 0
     assert set(reserved) == {"authorized-local-inference", "authorized-remote-inference"}
     assert all(profile["status"] == "not-implemented" for profile in reserved.values())
     lifecycle = {item["operation"]: item["disposition"] for item in payload["data"]["lifecycle"]}
@@ -58,6 +63,12 @@ def test_capabilities_reserve_remote_inference_without_enabling_it() -> None:
     assert lifecycle["idempotent-reinvocation"] == "implemented"
     assert lifecycle["status-service"] == "denied"
     assert lifecycle["cancel-command"] == "denied"
+    campaign_lifecycle = {
+        item["operation"]: item["disposition"] for item in payload["data"]["campaign_lifecycle"]
+    }
+    assert campaign_lifecycle["status"] == "implemented"
+    assert campaign_lifecycle["cancel"] == "implemented"
+    assert campaign_lifecycle["execute"] == "implemented"
     assert lifecycle["wall-clock-deadlines"] == "denied"
     assert lifecycle["automatic-retries"] == "denied"
     assert lifecycle["async-jobs"] == "denied"

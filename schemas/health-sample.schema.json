@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/q-uestionable-AI/RISI/schemas/health-sample.schema.json",
+  "title": "RISI isolated-target health sample",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "sample_sequence", "services", "cpu_percent", "memory_bytes",
+    "storage_bytes", "restart_count", "oom_kill_count", "firewall_denied_count", "metadata"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "sample_sequence": { "type": "integer", "minimum": 0 },
+    "services": { "type": "object", "additionalProperties": { "type": "string" } },
+    "cpu_percent": { "type": "number", "minimum": 0, "maximum": 100 },
+    "memory_bytes": { "type": "integer", "minimum": 0 },
+    "storage_bytes": { "type": "integer", "minimum": 0 },
+    "restart_count": { "type": "integer", "minimum": 0 },
+    "oom_kill_count": { "type": "integer", "minimum": 0 },
+    "firewall_denied_count": { "type": "integer", "minimum": 0 },
+    "metadata": { "type": "object", "additionalProperties": true }
+  }
+}

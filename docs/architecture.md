@@ -14,7 +14,8 @@ Versioned manifest, approval, result, and error contracts
 Model-independent safety kernel
         |
 Deterministic budget ledger and experiment runner
-        +---- MemoryAdapter ---- reference or future target memory server
+        +---- MemoryAdapter -------- local deterministic reference
+        +---- ExternalKnowledgeAdapter - closed isolated Dify Knowledge API
         +---- DecisionProvider - deterministic or future inference server
         +---- Evaluator -------- evaluator-only truth and safe-action oracle
         |
@@ -27,6 +28,12 @@ The implemented `local-reference` profile statically registers the reference mem
 deterministic approval and region providers, pure-read baseline, and closed `craf-reference` and
 `risi-c-reference` comparison policies. It denies network access, subprocesses, credentials,
 dynamic plugins, source-memory writes, and manifest-defined policy grants.
+
+The additive `isolated-dify-knowledge` profile uses separate external-target, campaign, approval,
+checkpoint, preflight, health, deviation, and result contracts. It does not change or extend a
+schema-v1 `RunManifest`. Its safety decision binds an exact target-manifest digest, private-input
+inventory digest, capability set, purpose, expiry, and attempt ceiling. E2 validation purpose cannot
+authorize E1 execution; a full campaign requires an independently accepted E3 decision.
 
 ## Control plane and data plane
 
@@ -80,6 +87,11 @@ localization evidence. Controlled RISI-C replay reconstructs all four arms, veri
 observer and decision artifact against the trace, recomputes both paired assessments, and requires
 the vulnerable/pure-read comparison to match the recorded evaluator result.
 
+Campaign replay is also model-free but has a narrower purpose. It verifies the bundle inventory,
+manifest/result identities, paired target-visible/evaluator record counts, and exact observation
+total. It never contacts Dify or re-embeds a document. Repeating a target request would be a new
+campaign attempt, not replay.
+
 Inspection verifies a bundle before returning a closed run, manifest, scenario, policy, result,
 resource, digest, and path summary. Comparison verifies both inputs before reporting exact equality
 or stable differing evidence paths and semantic anchors. Caller provenance stays outside the
@@ -117,6 +129,24 @@ conflated.
 
 ## External and standalone inference servers
 
+### Isolated Dify knowledge target
+
+The implemented external adapter is a memory/retrieval target, not an inference provider. It uses
+normal CA and hostname verification plus an exact peer-certificate SHA-256. The standard-library
+transport accepts one origin, a closed method/path allowlist, ten-second requests, bounded JSON
+responses, and zero automatic retries. Credentials are read only from a digest-bound
+operator-controlled file and are excluded from renderings, errors, manifests, and evidence.
+
+The adapter may create, inspect, and delete a knowledge base; create text documents; poll indexing;
+inspect a document and its single enabled segment; run semantic-vector top-five retrieval; and read
+the target health summary. Console, app, workflow, agent, upload, datasource, metadata-write,
+model-management, plugin-management, database, vector, Ollama, callback, and arbitrary paths are
+outside the transport allowlist.
+
+The campaign service is synchronous but retains checkpoints and accepts cooperative cancellation.
+Cancellation stops new requests, does not issue a compensating retry, and retains a deviation.
+Target-visible scenario worlds and evaluator-only oracles are loaded from separate private files.
+
 The decision layer is a replaceable `DecisionProvider`. A standalone inference server can
 eventually implement that interface without becoming the memory-system target. A server exposing
 persistent memory or retrieval instead implements `MemoryAdapter` and can be the RISI/CRAF target.
@@ -126,6 +156,7 @@ Before activation it must enforce an exact endpoint allowlist, model identity, r
 budgets, timeouts, redirect prohibition, credential policy, and operator approval. Application
 checks complement rather than replace host, container, firewall, or VLAN isolation.
 
-The implemented A1 lifecycle remains one synchronous process with cooperative interruption and
+The implemented local-reference A1 lifecycle remains one synchronous process with cooperative interruption and
 zero automatic retries. Status services, active cancel commands, wall-clock experimental
-deadlines, and asynchronous jobs remain denied pending a separately approved A2 contract.
+deadlines, and asynchronous jobs remain denied for that contract. The separate campaign lifecycle
+adds durable status and cancel records without changing local-reference behavior.

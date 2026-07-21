@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/q-uestionable-AI/RISI/schemas/campaign-approval.schema.json",
+  "title": "RISI isolated-target campaign approval",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "decision_id", "status", "purpose", "campaign_manifest_sha256",
+    "target_manifest_sha256", "input_inventory_sha256", "approved_by", "capabilities",
+    "expires_on", "max_attempts", "note"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "decision_id": { "type": "string", "minLength": 1 },
+    "status": { "const": "accepted" },
+    "purpose": { "enum": ["e2-validation", "e3-campaign"] },
+    "campaign_manifest_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "target_manifest_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "input_inventory_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "approved_by": { "type": "string", "minLength": 1 },
+    "capabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "target.connect", "secret.read", "knowledge-base.create", "knowledge-base.inspect",
+          "knowledge-base.delete", "document.create", "document.inspect", "document.delete",
+          "retrieval.execute", "health.read", "artifact.write", "evidence.verify"
+        ]
+      }
+    },
+    "expires_on": { "type": "string", "format": "date" },
+    "max_attempts": { "enum": [1, 3] },
+    "note": { "type": "string" }
+  }
+}

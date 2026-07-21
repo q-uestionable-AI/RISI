@@ -513,3 +513,36 @@ def recover_existing_result(artifact_root: Path, manifest: RunManifest) -> Recov
         reused=True,
     )
     return RecoveredResult(result, bundle_path, verification, summary)
+
+
+def inspect_campaign_bundle(path: Path) -> dict[str, JsonValue]:
+    """Verify and summarize an isolated-target campaign bundle."""
+    verification = verify_evidence_bundle(path)
+    manifest = load_json_artifact(path, "campaign-manifest.json")
+    result = load_json_artifact(path, "result.json")
+    if manifest.get("campaign_id") != verification.run_id:
+        raise ArtifactError("campaign manifest does not match the bundle identity")
+    if result.get("campaign_id") != verification.run_id:
+        raise ArtifactError("campaign result does not match the bundle identity")
+    return {
+        "campaign_id": verification.run_id,
+        "status": cast(JsonValue, result.get("status")),
+        "world_count": cast(JsonValue, result.get("world_count")),
+        "observation_count": cast(JsonValue, result.get("observation_count")),
+        "request_count": cast(JsonValue, result.get("request_count")),
+        "inventory_sha256": verification.inventory_sha256,
+        "bundle_hash": verification.bundle_hash,
+    }
+
+
+def compare_campaign_bundles(path_a: Path, path_b: Path) -> dict[str, JsonValue]:
+    """Verify and compare two campaign bundle inventories without target access."""
+    first = inspect_campaign_bundle(path_a)
+    second = inspect_campaign_bundle(path_b)
+    fields = ("status", "world_count", "observation_count", "request_count", "bundle_hash")
+    differences: list[JsonValue] = [
+        {"field": field, "first": first[field], "second": second[field]}
+        for field in fields
+        if first[field] != second[field]
+    ]
+    return {"equal": not differences, "differences": differences}

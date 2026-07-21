@@ -13,7 +13,8 @@ Versioned machine contracts
 Model-independent safety kernel
         |
 Deterministic budget ledger and runner
-        +---- MemoryAdapter
+        +---- MemoryAdapter (local reference)
+        +---- ExternalKnowledgeAdapter (isolated Dify)
         +---- DecisionProvider
         +---- Evaluator-only oracle
         |
@@ -25,6 +26,13 @@ Verify, inspect, compare, replay, and report
 The `local-reference` profile permits only registered deterministic components. Network access,
 subprocesses, credentials, dynamic plugins, and source-memory writes are denied. Closed reference
 policies may change only explicitly recorded derived state.
+
+The additive `isolated-dify-knowledge` profile is separate from schema-v1 local runs. It binds one
+pinned HTTPS target, separately fingerprinted API and health credentials, a closed Dify Knowledge
+API allowlist, exact campaign and input-inventory digests, purpose, expiry, attempt ceiling, and
+zero retries. E2
+validation approval cannot authorize an E1 campaign; full execution requires a matching accepted
+E3 decision.
 
 The immutable ledger checks each episode start, retrieval call, and decision proposal as a
 deterministic logical step. It also accounts for exact scenario bytes, source-memory records, and
@@ -92,9 +100,13 @@ decisions throughout.
 
 The repository implements the DEP-01 pure-read baseline, one intentionally controlled synthetic
 CRAF mechanism with a protected control, and one controlled DEP-02 RISI-C mechanism with a
-pure-read ablation. External adapters, executable inference profiles, live targets, autonomous
-campaigns, and statistical or external vulnerability claims remain gated future work.
+pure-read ablation. Unreleased source also implements one closed Dify 1.15 knowledge-target adapter,
+pinned standard-library HTTPS transport, campaign lifecycle, fixed E1 geometry checks, and
+campaign evidence/replay contracts. Target deployment and private inputs remain outside the public
+repository. E3 execution, executable inference profiles, and statistical or external vulnerability
+claims remain separately gated.
 
 The A1 process model is synchronous with zero automatic retries and cooperative interruption. It
 does not expose a status service, cancel command, wall-clock experimental deadline, or asynchronous
-job surface.
+job surface. The separate campaign lifecycle remains synchronous but has durable status and
+cooperative cancel records under the same safety kernel.

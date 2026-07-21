@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/q-uestionable-AI/RISI/schemas/preflight-result.schema.json",
+  "title": "RISI external-target preflight result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "campaign_id", "target_manifest_sha256", "campaign_manifest_sha256",
+    "input_inventory_sha256", "passed", "checks", "attempt"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "campaign_id": { "type": "string", "minLength": 1 },
+    "target_manifest_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "campaign_manifest_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "input_inventory_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "passed": { "type": "boolean" },
+    "checks": { "type": "object", "additionalProperties": true },
+    "attempt": { "type": "integer", "minimum": 1, "maximum": 3 }
+  }
+}

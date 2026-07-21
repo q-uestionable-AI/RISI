@@ -40,12 +40,24 @@ class Capability(StrEnum):
     ARTIFACT_WRITE = "artifact.write"
     REFERENCE_EXECUTE = "reference.execute"
     EVIDENCE_VERIFY = "evidence.verify"
+    TARGET_CONNECT = "target.connect"
+    # This is a capability identifier, not credential material.
+    SECRET_READ = "secret.read"  # noqa: S105  # nosec B105
+    KNOWLEDGE_BASE_CREATE = "knowledge-base.create"
+    KNOWLEDGE_BASE_INSPECT = "knowledge-base.inspect"
+    KNOWLEDGE_BASE_DELETE = "knowledge-base.delete"
+    DOCUMENT_CREATE = "document.create"
+    DOCUMENT_INSPECT = "document.inspect"
+    DOCUMENT_DELETE = "document.delete"
+    RETRIEVAL_EXECUTE = "retrieval.execute"
+    HEALTH_READ = "health.read"
 
 
 class ExecutionProfile(StrEnum):
     """Implemented execution profiles."""
 
     LOCAL_REFERENCE = "local-reference"
+    ISOLATED_DIFY_KNOWLEDGE = "isolated-dify-knowledge"
 
 
 class ResultStatus(StrEnum):

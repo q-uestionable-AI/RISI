@@ -30,8 +30,16 @@ manifests and tool calls cannot grant authority. Approval JSON binds provenance 
 but is not authentication; stronger deployments must protect or sign it outside the agent's
 writable context.
 
-The harness cannot replace host-level egress enforcement. Use container, firewall, or VLAN controls
-for any future network-capable profile.
+The harness cannot replace host-level egress enforcement. The `isolated-dify-knowledge` profile
+requires a dedicated controlled target, frozen firewall/VLAN/container state, normal CA and
+hostname verification plus a peer-certificate pin, and separately fingerprinted API and health
+credentials. It does not
+grant access to other hosts or services. Use host enforcement for every network-capable profile.
+
+E2 validation authority is engineering authority only. It must not be reused as E3 campaign
+approval. Do not create the campaign evidence path, run targeted inputs, interpret an outcome, or
+publish a claim unless a separate human decision binds the exact target, campaign, private-input,
+preflight, evidence, expiry, and attempt identities.
 
 ## Responsible disclosure
 

@@ -67,6 +67,7 @@ from risi.operator.safety import (
     RISI_C_REFERENCE_POLICY,
     AuthorizationDecision,
     authorize_run,
+    isolated_dify_profile,
     resolve_artifact_root,
     resolve_existing_path,
 )
@@ -250,6 +251,7 @@ def capabilities_result() -> CommandResult:
         LOCAL_REFERENCE_OBLIGATION_POLICY.to_json(),
         CRAF_REFERENCE_POLICY.to_json(),
         RISI_C_REFERENCE_POLICY.to_json(),
+        isolated_dify_profile(),
     ]
     future_profiles: list[JsonValue] = [
         {
@@ -302,6 +304,20 @@ def capabilities_result() -> CommandResult:
         "evidence.delete",
         "human-review.accept",
     ]
+    campaign_lifecycle: list[JsonValue] = [
+        {"operation": operation, "disposition": "implemented"}
+        for operation in (
+            "prepare",
+            "preflight",
+            "status",
+            "cancel",
+            "execute",
+            "inspect",
+            "verify",
+            "compare",
+            "replay",
+        )
+    ]
     return CommandResult(
         command="capabilities",
         status=ResultStatus.OK,
@@ -309,6 +325,7 @@ def capabilities_result() -> CommandResult:
             "profiles": profiles,
             "future_profiles": future_profiles,
             "lifecycle": lifecycle,
+            "campaign_lifecycle": campaign_lifecycle,
             "authority_denials": authority_denials,
             "execution_model": "synchronous",
             "automatic_retry_count": 0,

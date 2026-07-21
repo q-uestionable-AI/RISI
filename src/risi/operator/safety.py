@@ -82,6 +82,41 @@ class AuthorizationDecision:
         }
 
 
+ISOLATED_DIFY_CAPABILITIES = frozenset(
+    {
+        Capability.TARGET_CONNECT,
+        Capability.SECRET_READ,
+        Capability.KNOWLEDGE_BASE_CREATE,
+        Capability.KNOWLEDGE_BASE_INSPECT,
+        Capability.KNOWLEDGE_BASE_DELETE,
+        Capability.DOCUMENT_CREATE,
+        Capability.DOCUMENT_INSPECT,
+        Capability.DOCUMENT_DELETE,
+        Capability.RETRIEVAL_EXECUTE,
+        Capability.HEALTH_READ,
+        Capability.ARTIFACT_WRITE,
+        Capability.EVIDENCE_VERIFY,
+    }
+)
+
+
+def isolated_dify_profile() -> dict[str, JsonValue]:
+    """Return the closed public capability declaration for the E2 target profile."""
+    capabilities = cast(list[JsonValue], sorted(item.value for item in ISOLATED_DIFY_CAPABILITIES))
+    return {
+        "profile": ExecutionProfile.ISOLATED_DIFY_KNOWLEDGE.value,
+        "capabilities": capabilities,
+        "adapter": "dify-knowledge-1.15",
+        "transport": "pinned-https",
+        "network": "one-frozen-target",
+        "subprocesses": "denied",
+        "credentials": "fingerprint-bound-secret-file",
+        "dynamic_plugins": "denied",
+        "request_timeout_seconds": 10,
+        "automatic_retry_count": 0,
+    }
+
+
 LOCAL_REFERENCE_POLICY = SafetyPolicy(
     profile=ExecutionProfile.LOCAL_REFERENCE,
     capabilities=frozenset(

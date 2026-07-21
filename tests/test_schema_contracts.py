@@ -3,6 +3,14 @@ import re
 from dataclasses import fields
 from pathlib import Path
 
+from risi.adapters.external import ExternalTargetManifest
+from risi.campaign import (
+    CampaignApproval,
+    CampaignCheckpoint,
+    CampaignManifest,
+    Deviation,
+    PreflightResult,
+)
 from risi.canonical import canonical_sha256
 from risi.confidentiality import (
     ObserverExchange,
@@ -108,6 +116,12 @@ def test_operator_schema_fields_match_python_contracts() -> None:
         "run-manifest.schema.json": RunManifest,
         "approval.schema.json": ApprovalRecord,
         "result.schema.json": CommandResult,
+        "external-target-manifest.schema.json": ExternalTargetManifest,
+        "campaign-manifest.schema.json": CampaignManifest,
+        "campaign-approval.schema.json": CampaignApproval,
+        "external-target-checkpoint.schema.json": CampaignCheckpoint,
+        "preflight-result.schema.json": PreflightResult,
+        "deviation.schema.json": Deviation,
     }
     for schema_name, contract in contracts.items():
         schema = _load_json(SCHEMA_ROOT / schema_name)

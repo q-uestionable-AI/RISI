@@ -9,8 +9,10 @@
 [![Docs](https://img.shields.io/badge/docs-risi.q--uestionable.ai-8b5cf6)](https://risi.q-uestionable.ai)
 
 RISI is a Python library and command-line tool for deterministic experiments about
-retrieval-related changes in persistent AI-agent memory. The current implementation runs
-synthetic reference scenarios; it does not test external systems.
+retrieval-related changes in persistent AI-agent memory. Release `0.1.0` runs synthetic reference
+scenarios only. Unreleased source also contains a separately approved, closed adapter and campaign
+contract for one isolated self-hosted Dify 1.15 Knowledge API target. It does not authorize a
+campaign or establish a finding about Dify or another external system.
 
 The project distinguishes:
 
@@ -27,7 +29,7 @@ Failure (CAAF) remains a separate exploratory admission-stage phenomenon and is 
 
 ## Status
 
-Version 0.1.0 provides:
+Released version 0.1.0 provides:
 
 - JSON schemas for runs, approvals, scenarios, results, events, state, and evidence;
 - a deterministic `local-reference` profile with no model or network access;
@@ -43,14 +45,23 @@ Version 0.1.0 provides:
 The reference comparisons include intentionally vulnerable and protected synthetic policies. Their
 results describe those fixtures only and are not evidence about another system.
 
-The repository does not implement an external attack, external inference, a database, or a
-connection to consequential systems. Project governance is kept in a private governance vault;
+Unreleased source adds the `isolated-dify-knowledge` profile. It is limited to a pinned HTTPS
+origin and certificate, an operator-controlled credential file with separately fingerprinted API
+and health credentials, the documented Dify knowledge-base,
+document, indexing, segment, retrieval, deletion, and health operations, ten-second requests,
+planned indexing polls, and zero automatic retries. Campaign manifests bind the exact target and
+private-input inventory. Full execution fails closed unless a separate E3 approval matches every
+bound digest. The profile does not provide external inference, a generative model, an arbitrary
+HTTP client, or a connection to consequential systems.
+
+Project governance is kept in a private governance vault;
 research records and evidence are kept in a separate private Lab workspace. Local project tooling
 locates them through `RISI_VAULT_ROOT` and `RISI_RESEARCH_ROOT`. Those locations are not part of the
 public package interface.
 
-Capability output lists reserved local/lab and remote HTTPS inference profiles. They are marked
-`not-implemented` and do not enable networking, credentials, adapters, or model access.
+Capability output distinguishes the implemented source-only `isolated-dify-knowledge` contract
+from the reserved local/lab and remote HTTPS inference profiles. The inference profiles remain
+`not-implemented` and do not enable model access.
 
 ## Install
 
@@ -133,10 +144,18 @@ profile.
 
 The current lifecycle runs in one synchronous process with cooperative interruption and zero
 automatic retries. It has no status service, cancel command, asynchronous jobs, or wall-clock
-experimental deadline. `risi capabilities --format json` reports these constraints.
+experimental deadline. Those statements describe the released local-reference lifecycle.
 
-External adapters are not implemented. Any later adapter would require separate approval, host or
-network isolation, bounded credentials and resources, and redacted request and response records.
+The unreleased isolated-target lifecycle provides `risi campaign prepare`, `preflight`, `status`,
+`cancel`, `execute`, `inspect`, `verify`, `compare`, and `replay`. Every mutating operation uses the
+same campaign approval decision below the CLI. Cancellation prevents new requests, does not retry
+an in-flight request, and retains an immutable deviation. The campaign evidence writer remains
+atomic and read-only inspection, verification, comparison, and replay do not contact the target.
+
+The Dify adapter is not a general external-system grant. Its deployment still requires the exact
+private target manifest, host and network isolation, bounded credentials, and a separately accepted
+campaign approval. No target-visible request receives evaluator-only truth, criticality, or
+applicability material.
 
 ## Development and documentation
 
