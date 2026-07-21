@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import re
 from abc import ABC, abstractmethod
@@ -140,6 +141,19 @@ class TargetCredential:
             raise OperatorInputError("target credential is invalid")
 
 
+def credential_sha256_fingerprint(value: str) -> str:
+    """Return an identity fingerprint for a high-entropy bearer credential.
+
+    This function does not derive or store a password verifier. The closed E2 contract requires
+    independently generated, high-entropy API and health tokens; SHA-256 binds those opaque token
+    identities to the separately authorized target manifest.
+    """
+    # CodeQL classifies credential-named inputs as passwords, but this is an opaque-token identity
+    # fingerprint rather than password hashing.
+    # codeql[py/weak-sensitive-data-hashing]  # noqa: ERA001
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
 def load_target_credential(path: Path, manifest: ExternalTargetManifest) -> TargetCredential:
     """Load fingerprint-bound secrets from an operator-controlled regular file."""
     try:
@@ -165,9 +179,11 @@ def load_target_credential(path: Path, manifest: ExternalTargetManifest) -> Targ
     if target_id != manifest.target_id:
         raise OperatorInputError("target credential is bound to another target")
     credential = TargetCredential(target_id, api_key, health_token)
-    if hashlib.sha256(api_key.encode("utf-8")).hexdigest() != manifest.api_key_sha256:
+    if not hmac.compare_digest(credential_sha256_fingerprint(api_key), manifest.api_key_sha256):
         raise OperatorInputError("target API key fingerprint does not match the manifest")
-    if hashlib.sha256(health_token.encode("utf-8")).hexdigest() != manifest.health_token_sha256:
+    if not hmac.compare_digest(
+        credential_sha256_fingerprint(health_token), manifest.health_token_sha256
+    ):
         raise OperatorInputError("target health token fingerprint does not match the manifest")
     return credential
 

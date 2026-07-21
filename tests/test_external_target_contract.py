@@ -5,7 +5,11 @@ from pathlib import Path
 import pytest
 
 from risi.adapters.dify import DIFY_API_PATHS
-from risi.adapters.external import ExternalTargetManifest, load_target_credential
+from risi.adapters.external import (
+    ExternalTargetManifest,
+    credential_sha256_fingerprint,
+    load_target_credential,
+)
 from risi.operator.models import ExecutionProfile, OperatorInputError
 from risi.transport import AllowedRoute, CancellationToken, HttpsTransport, TransportError
 
@@ -117,8 +121,8 @@ def test_fingerprint_bound_credential_never_renders_secret(tmp_path: Path) -> No
     path = tmp_path / "target-admin.json"
     path.write_bytes(content)
     target = _target(
-        hashlib.sha256(secret["api_key"].encode()).hexdigest(),
-        hashlib.sha256(secret["health_token"].encode()).hexdigest(),
+        credential_sha256_fingerprint(secret["api_key"]),
+        credential_sha256_fingerprint(secret["health_token"]),
     )
 
     credential = load_target_credential(path, target)
@@ -147,8 +151,8 @@ def test_credential_rejects_individual_secret_fingerprint_mismatch(
     path = tmp_path / "target-admin.json"
     path.write_text(json.dumps(secret), encoding="utf-8")
     fingerprints = {
-        "api_key_sha256": hashlib.sha256(secret["api_key"].encode()).hexdigest(),
-        "health_token_sha256": hashlib.sha256(secret["health_token"].encode()).hexdigest(),
+        "api_key_sha256": credential_sha256_fingerprint(secret["api_key"]),
+        "health_token_sha256": credential_sha256_fingerprint(secret["health_token"]),
     }
     fingerprints[fingerprint_name] = "0" * 64
     target = _target(**fingerprints)

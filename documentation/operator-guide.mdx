@@ -102,12 +102,14 @@ The unreleased source exposes these commands under `risi campaign`:
   creating an evidence root; and
 - `inspect`, `verify`, `compare`, and `replay` are model-free and do not contact the target.
 
-Credentials are passed by file path, never as a CLI value. The API key and health token must
-independently match their SHA-256 fingerprints in the target manifest. The exact credential object
-contains `target_id`, `api_key`, and a separate `health_token`; neither secret is renderable by the
-adapter. Target and campaign manifests contain no secret value. A full E1
-request presented with E2 validation approval returns `BLOCKED_BY_POLICY` before secret, input, or
-evidence-path access.
+Credentials are passed by file path, never as a CLI value. The API key and health token must be
+independently generated, high-entropy bearer tokens and independently match their SHA-256 identity
+fingerprints in the target manifest. These fingerprints bind opaque token identities to the
+authorized target; they are not password verifiers and must not be used with human-chosen secrets.
+The exact credential object contains `target_id`, `api_key`, and a separate `health_token`; neither
+secret is renderable by the adapter. Target and campaign manifests contain no secret value. A full
+E1 request presented with E2 validation approval returns `BLOCKED_BY_POLICY` before secret, input,
+or evidence-path access.
 
 The campaign lifecycle is synchronous. A cancel record prevents the next request; an already
 dispatched request may complete and is retained, but is never repeated. A service error, malformed
