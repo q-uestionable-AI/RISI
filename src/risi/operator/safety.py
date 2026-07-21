@@ -110,7 +110,7 @@ def isolated_dify_profile() -> dict[str, JsonValue]:
         "transport": "pinned-https",
         "network": "one-frozen-target",
         "subprocesses": "denied",
-        "credentials": "fingerprint-bound-secret-file",
+        "credentials": "pbkdf2-sha256-verifier-bound-secret-file",
         "dynamic_plugins": "denied",
         "request_timeout_seconds": 10,
         "automatic_retry_count": 0,

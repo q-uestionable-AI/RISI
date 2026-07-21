@@ -16,7 +16,8 @@ Add a separate `isolated-dify-knowledge` profile and `ExternalKnowledgeAdapter`.
 the schema-v1 `local-reference` contract. An external execution requires three independent objects:
 
 1. an external-target manifest that binds the HTTPS origin, normal CA/hostname validation, peer
-   certificate digest, separate API-key and health-token fingerprints, exact Dify API paths,
+   certificate digest, separate PBKDF2-SHA256 API-key and health-token verifiers, exact Dify API
+   paths,
    service identities, ten-second request deadline, one-second indexing poll, 300-second indexing
    limit, and zero retries;
 2. a campaign manifest that binds the target digest, private-input inventory digest, geometry,

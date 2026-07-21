@@ -52,7 +52,7 @@ def test_capabilities_expose_closed_dify_profile_and_reserve_inference_profiles(
     assert implemented["local-reference"]["credentials"] == "denied"
     dify = implemented["isolated-dify-knowledge"]
     assert dify["network"] == "one-frozen-target"
-    assert dify["credentials"] == "fingerprint-bound-secret-file"
+    assert dify["credentials"] == "pbkdf2-sha256-verifier-bound-secret-file"
     assert dify["request_timeout_seconds"] == 10
     assert dify["automatic_retry_count"] == 0
     assert set(reserved) == {"authorized-local-inference", "authorized-remote-inference"}

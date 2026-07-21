@@ -46,8 +46,8 @@ The reference comparisons include intentionally vulnerable and protected synthet
 results describe those fixtures only and are not evidence about another system.
 
 Unreleased source adds the `isolated-dify-knowledge` profile. It is limited to a pinned HTTPS
-origin and certificate, an operator-controlled credential file with separately fingerprinted API
-and health credentials, the documented Dify knowledge-base,
+origin and certificate, an operator-controlled credential file with separate PBKDF2-SHA256
+verifiers for API and health credentials, the documented Dify knowledge-base,
 document, indexing, segment, retrieval, deletion, and health operations, ten-second requests,
 planned indexing polls, and zero automatic retries. Campaign manifests bind the exact target and
 private-input inventory. Full execution fails closed unless a separate E3 approval matches every

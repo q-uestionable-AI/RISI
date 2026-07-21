@@ -6,7 +6,8 @@
   "additionalProperties": false,
   "required": [
     "schema_version", "target_id", "profile", "base_url", "server_name",
-    "certificate_sha256", "ca_certificate_path", "api_key_sha256", "health_token_sha256",
+    "certificate_sha256", "ca_certificate_path", "api_key_pbkdf2_sha256",
+    "health_token_pbkdf2_sha256",
     "api_paths", "identities", "request_timeout_seconds", "automatic_retry_count",
     "indexing_poll_seconds", "indexing_timeout_seconds", "metadata"
   ],
@@ -18,8 +19,8 @@
     "server_name": { "const": "risi-dify-e1" },
     "certificate_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
     "ca_certificate_path": { "type": "string", "minLength": 1 },
-    "api_key_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-    "health_token_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "api_key_pbkdf2_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "health_token_pbkdf2_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
     "api_paths": { "$ref": "#/$defs/jsonObject" },
     "identities": { "$ref": "#/$defs/jsonObject" },
     "request_timeout_seconds": { "const": 10 },

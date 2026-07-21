@@ -114,8 +114,8 @@ def test_adapter_rejects_substituted_model_or_provider_identity() -> None:
             manifest.server_name,
             manifest.certificate_sha256,
             manifest.ca_certificate_path,
-            manifest.api_key_sha256,
-            manifest.health_token_sha256,
+            manifest.api_key_pbkdf2_sha256,
+            manifest.health_token_pbkdf2_sha256,
             manifest.api_paths,
             identities,
         )

@@ -45,8 +45,9 @@ profile for one self-hosted Dify 1.15 Knowledge API target. It does not enable a
 generative model, hosted provider, arbitrary URL, or general network access.
 
 The target manifest binds one HTTPS origin, normal CA and hostname verification, the exact peer
-certificate digest, separate API-key and health-token fingerprints, Dify/API identities, allowed
-method/path templates, ten-second request deadline, one-second planned indexing poll, 300-second
+certificate digest, separate PBKDF2-SHA256 API-key and health-token verifiers, Dify/API identities,
+allowed method/path templates, ten-second request deadline, one-second planned indexing poll,
+300-second
 indexing ceiling, and zero retries. Console, app, workflow, agent, model-management,
 plugin-management, database, vector,
 Ollama, callback, and arbitrary routes are denied by the frozen Nginx and application allowlists.

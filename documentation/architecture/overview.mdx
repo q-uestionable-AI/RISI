@@ -28,8 +28,9 @@ subprocesses, credentials, dynamic plugins, and source-memory writes are denied.
 policies may change only explicitly recorded derived state.
 
 The additive `isolated-dify-knowledge` profile is separate from schema-v1 local runs. It binds one
-pinned HTTPS target, separately fingerprinted API and health credentials, a closed Dify Knowledge
-API allowlist, exact campaign and input-inventory digests, purpose, expiry, attempt ceiling, and
+pinned HTTPS target, separate PBKDF2-SHA256 API and health credential verifiers, a closed Dify
+Knowledge API allowlist, exact campaign and input-inventory digests, purpose, expiry, attempt
+ceiling, and
 zero retries. E2
 validation approval cannot authorize an E1 campaign; full execution requires a matching accepted
 E3 decision.

@@ -23,7 +23,8 @@ workspace configured by the operator.
   final paths.
 - Stable JSON CLI lifecycle discovery, including synchronous A1 support and hard denials.
 - An unreleased additive `isolated-dify-knowledge` profile with pinned standard-library HTTPS,
-  separately fingerprinted API and health credentials, a closed Dify 1.15 Knowledge API allowlist,
+  separate PBKDF2-SHA256 API and health credential verifiers, a closed Dify 1.15 Knowledge API
+  allowlist,
   and zero retries.
 - Exact external-target, campaign, approval, checkpoint, preflight, health, deviation, and result
   contracts with prepare, preflight, status, cancel, execute, inspect, verify, compare, and replay

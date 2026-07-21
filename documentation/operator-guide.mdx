@@ -20,7 +20,7 @@ scope. It provides provenance and change detection, not authentication. Protect 
 an agent's writable context when a stronger boundary is required.
 
 The isolated-target lifecycle uses three separate contracts. The target manifest binds transport,
-certificate, credential fingerprints, API-path, and service identities. The campaign manifest
+certificate, credential verifiers, API-path, and service identities. The campaign manifest
 binds that target digest, the private-input inventory digest, geometry, retrieval settings, evidence
 path, and expiry. Campaign approval binds both manifests, the inventory, exact capabilities,
 purpose, expiry, and attempt ceiling. A manifest requests authority; it never supplies a grant.
@@ -103,10 +103,10 @@ The unreleased source exposes these commands under `risi campaign`:
 - `inspect`, `verify`, `compare`, and `replay` are model-free and do not contact the target.
 
 Credentials are passed by file path, never as a CLI value. The API key and health token must be
-independently generated, high-entropy bearer tokens and independently match their SHA-256 identity
-fingerprints in the target manifest. These fingerprints bind opaque token identities to the
-authorized target; they are not password verifiers and must not be used with human-chosen secrets.
-The exact credential object contains `target_id`, `api_key`, and a separate `health_token`; neither
+independently generated bearer tokens and independently match their PBKDF2-HMAC-SHA256 verifiers in
+the target manifest. Verifier salts are domain-separated by the RISI contract version, target ID,
+and credential purpose. Verification uses 600,000 iterations and constant-time comparison. The
+exact credential object contains `target_id`, `api_key`, and a separate `health_token`; neither
 secret is renderable by the adapter. Target and campaign manifests contain no secret value. A full
 E1 request presented with E2 validation approval returns `BLOCKED_BY_POLICY` before secret, input,
 or evidence-path access.

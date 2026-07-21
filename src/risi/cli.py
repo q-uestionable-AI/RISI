@@ -530,7 +530,7 @@ def campaign_preflight_command(  # noqa: PLR0913 - CLI exposes independently bou
     campaign_path: Path = typer.Argument(..., help="Campaign manifest JSON path."),
     approval_path: Path = typer.Option(..., "--approval", help="Campaign approval JSON path."),
     credential_path: Path = typer.Option(
-        ..., "--credential", help="Credential file with fingerprint-bound secrets."
+        ..., "--credential", help="Credential file with verifier-bound secrets."
     ),
     workspace: Path = typer.Option(..., "--workspace", help="Operator lifecycle workspace."),
     attempt: int = typer.Option(1, "--attempt", help="Separately retained preflight attempt."),
@@ -634,7 +634,7 @@ def campaign_execute_command(  # noqa: PLR0913 - CLI exposes independently bound
     campaign_path: Path = typer.Argument(..., help="Campaign manifest JSON path."),
     approval_path: Path = typer.Option(..., "--approval", help="Campaign approval JSON path."),
     credential_path: Path = typer.Option(
-        ..., "--credential", help="Credential file with fingerprint-bound secrets."
+        ..., "--credential", help="Credential file with verifier-bound secrets."
     ),
     input_root: Path = typer.Option(..., "--input-root", help="Frozen private-input directory."),
     artifact_root: Path = typer.Option(..., "--artifact-root", help="Approved evidence parent."),

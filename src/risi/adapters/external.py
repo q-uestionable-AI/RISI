@@ -9,7 +9,7 @@ import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Literal, cast
 from urllib.parse import urlsplit
 
 from risi.canonical import (
@@ -34,8 +34,8 @@ class ExternalTargetManifest:
     server_name: str
     certificate_sha256: str
     ca_certificate_path: str
-    api_key_sha256: str
-    health_token_sha256: str
+    api_key_pbkdf2_sha256: str
+    health_token_pbkdf2_sha256: str
     api_paths: JsonObject
     identities: JsonObject
     request_timeout_seconds: int = 10
@@ -77,9 +77,11 @@ class ExternalTargetManifest:
             raise OperatorInputError("base_url host is not the frozen target identity")
         if self.server_name != "risi-dify-e1":
             raise OperatorInputError("server_name is not the frozen E1 target identity")
-        for name in ("certificate_sha256", "api_key_sha256", "health_token_sha256"):
+        if re.fullmatch(r"[a-f0-9]{64}", self.certificate_sha256) is None:
+            raise OperatorInputError("certificate_sha256 must be a lowercase SHA-256 digest")
+        for name in ("api_key_pbkdf2_sha256", "health_token_pbkdf2_sha256"):
             if re.fullmatch(r"[a-f0-9]{64}", getattr(self, name)) is None:
-                raise OperatorInputError(f"{name} must be a lowercase SHA-256 digest")
+                raise OperatorInputError(f"{name} must be a lowercase PBKDF2-SHA256 verifier")
         if not self.ca_certificate_path.strip():
             raise OperatorInputError("ca_certificate_path must not be empty")
 
@@ -107,8 +109,8 @@ class ExternalTargetManifest:
             "server_name": self.server_name,
             "certificate_sha256": self.certificate_sha256,
             "ca_certificate_path": self.ca_certificate_path,
-            "api_key_sha256": self.api_key_sha256,
-            "health_token_sha256": self.health_token_sha256,
+            "api_key_pbkdf2_sha256": self.api_key_pbkdf2_sha256,
+            "health_token_pbkdf2_sha256": self.health_token_pbkdf2_sha256,
             "api_paths": normalize_json_object(self.api_paths),
             "identities": normalize_json_object(self.identities),
             "request_timeout_seconds": self.request_timeout_seconds,
@@ -141,21 +143,31 @@ class TargetCredential:
             raise OperatorInputError("target credential is invalid")
 
 
-def credential_sha256_fingerprint(value: str) -> str:
-    """Return an identity fingerprint for a high-entropy bearer credential.
+_CREDENTIAL_PBKDF2_ITERATIONS = 600_000
 
-    This function does not derive or store a password verifier. The closed E2 contract requires
-    independently generated, high-entropy API and health tokens; SHA-256 binds those opaque token
-    identities to the separately authorized target manifest.
+
+def credential_pbkdf2_sha256(
+    value: str,
+    target_id: str,
+    purpose: Literal["api-key", "health-token"],
+) -> str:
+    """Return a domain-separated PBKDF2-SHA256 credential verifier.
+
+    The salt binds the verifier to the RISI contract version, target, and credential purpose so
+    one verifier cannot be reused for another target or authorization channel.
     """
-    # CodeQL classifies credential-named inputs as passwords, but this is an opaque-token identity
-    # fingerprint rather than password hashing.
-    # codeql[py/weak-sensitive-data-hashing]  # noqa: ERA001
-    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+    salt = f"risi:e2:credential:v1:{target_id}:{purpose}".encode()
+    return hashlib.pbkdf2_hmac(
+        "sha256",
+        value.encode("utf-8"),
+        salt,
+        _CREDENTIAL_PBKDF2_ITERATIONS,
+        dklen=32,
+    ).hex()
 
 
 def load_target_credential(path: Path, manifest: ExternalTargetManifest) -> TargetCredential:
-    """Load fingerprint-bound secrets from an operator-controlled regular file."""
+    """Load verifier-bound secrets from an operator-controlled regular file."""
     try:
         resolved = path.resolve(strict=True)
         if not resolved.is_file() or resolved.is_symlink():
@@ -179,12 +191,16 @@ def load_target_credential(path: Path, manifest: ExternalTargetManifest) -> Targ
     if target_id != manifest.target_id:
         raise OperatorInputError("target credential is bound to another target")
     credential = TargetCredential(target_id, api_key, health_token)
-    if not hmac.compare_digest(credential_sha256_fingerprint(api_key), manifest.api_key_sha256):
-        raise OperatorInputError("target API key fingerprint does not match the manifest")
     if not hmac.compare_digest(
-        credential_sha256_fingerprint(health_token), manifest.health_token_sha256
+        credential_pbkdf2_sha256(api_key, target_id, "api-key"),
+        manifest.api_key_pbkdf2_sha256,
     ):
-        raise OperatorInputError("target health token fingerprint does not match the manifest")
+        raise OperatorInputError("target API key verifier does not match the manifest")
+    if not hmac.compare_digest(
+        credential_pbkdf2_sha256(health_token, target_id, "health-token"),
+        manifest.health_token_pbkdf2_sha256,
+    ):
+        raise OperatorInputError("target health token verifier does not match the manifest")
     return credential
 
 
@@ -202,8 +218,8 @@ def load_external_target_manifest(path: Path) -> ExternalTargetManifest:
         "server_name",
         "certificate_sha256",
         "ca_certificate_path",
-        "api_key_sha256",
-        "health_token_sha256",
+        "api_key_pbkdf2_sha256",
+        "health_token_pbkdf2_sha256",
         "api_paths",
         "identities",
         "request_timeout_seconds",
@@ -238,8 +254,8 @@ def load_external_target_manifest(path: Path) -> ExternalTargetManifest:
         "server_name",
         "certificate_sha256",
         "ca_certificate_path",
-        "api_key_sha256",
-        "health_token_sha256",
+        "api_key_pbkdf2_sha256",
+        "health_token_pbkdf2_sha256",
     )
     if any(not isinstance(value[name], str) for name in string_fields):
         raise OperatorInputError("external target identity fields must be strings")
@@ -251,8 +267,8 @@ def load_external_target_manifest(path: Path) -> ExternalTargetManifest:
         server_name=cast(str, value["server_name"]),
         certificate_sha256=cast(str, value["certificate_sha256"]),
         ca_certificate_path=cast(str, value["ca_certificate_path"]),
-        api_key_sha256=cast(str, value["api_key_sha256"]),
-        health_token_sha256=cast(str, value["health_token_sha256"]),
+        api_key_pbkdf2_sha256=cast(str, value["api_key_pbkdf2_sha256"]),
+        health_token_pbkdf2_sha256=cast(str, value["health_token_pbkdf2_sha256"]),
         api_paths=cast(dict[str, Any], value["api_paths"]),
         identities=cast(dict[str, Any], value["identities"]),
         request_timeout_seconds=cast(int, value["request_timeout_seconds"]),

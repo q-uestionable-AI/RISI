@@ -7,7 +7,7 @@ import pytest
 from risi.adapters.dify import DIFY_API_PATHS
 from risi.adapters.external import (
     ExternalTargetManifest,
-    credential_sha256_fingerprint,
+    credential_pbkdf2_sha256,
     load_target_credential,
 )
 from risi.operator.models import ExecutionProfile, OperatorInputError
@@ -63,8 +63,8 @@ class FakeConnection:
 
 
 def _target(
-    api_key_sha256: str = "c" * 64,
-    health_token_sha256: str = "d" * 64,
+    api_key_pbkdf2_sha256: str = "c" * 64,
+    health_token_pbkdf2_sha256: str = "d" * 64,
 ) -> ExternalTargetManifest:
     return ExternalTargetManifest(
         schema_version=1,
@@ -74,8 +74,8 @@ def _target(
         server_name="risi-dify-e1",
         certificate_sha256="b" * 64,
         ca_certificate_path="ca.pem",
-        api_key_sha256=api_key_sha256,
-        health_token_sha256=health_token_sha256,
+        api_key_pbkdf2_sha256=api_key_pbkdf2_sha256,
+        health_token_pbkdf2_sha256=health_token_pbkdf2_sha256,
         api_paths=DIFY_API_PATHS,
         identities={"dify_version": "1.15.0"},
     )
@@ -90,6 +90,14 @@ def test_target_manifest_freezes_profile_deadline_retry_and_identity() -> None:
     assert target.indexing_poll_seconds == 1
     assert target.indexing_timeout_seconds == 300
     assert len(target.digest) == 64
+
+
+def test_credential_verifier_is_target_and_purpose_bound() -> None:
+    verifier = credential_pbkdf2_sha256("synthetic-secret", "risi-dify-e1", "api-key")
+
+    assert len(verifier) == 64
+    assert verifier != credential_pbkdf2_sha256("synthetic-secret", "risi-dify-e1", "health-token")
+    assert verifier != credential_pbkdf2_sha256("synthetic-secret", "another-target", "api-key")
 
 
 def test_target_manifest_denies_wrong_host_and_retry() -> None:
@@ -111,7 +119,7 @@ def test_target_manifest_denies_wrong_host_and_retry() -> None:
         )
 
 
-def test_fingerprint_bound_credential_never_renders_secret(tmp_path: Path) -> None:
+def test_verifier_bound_credential_never_renders_secret(tmp_path: Path) -> None:
     secret = {
         "target_id": "risi-dify-e1",
         "api_key": "secret-value-do-not-render",
@@ -121,8 +129,8 @@ def test_fingerprint_bound_credential_never_renders_secret(tmp_path: Path) -> No
     path = tmp_path / "target-admin.json"
     path.write_bytes(content)
     target = _target(
-        credential_sha256_fingerprint(secret["api_key"]),
-        credential_sha256_fingerprint(secret["health_token"]),
+        credential_pbkdf2_sha256(secret["api_key"], "risi-dify-e1", "api-key"),
+        credential_pbkdf2_sha256(secret["health_token"], "risi-dify-e1", "health-token"),
     )
 
     credential = load_target_credential(path, target)
@@ -134,14 +142,14 @@ def test_fingerprint_bound_credential_never_renders_secret(tmp_path: Path) -> No
 
 
 @pytest.mark.parametrize(
-    ("fingerprint_name", "expected_message"),
+    ("verifier_name", "expected_message"),
     [
-        ("api_key_sha256", "API key fingerprint"),
-        ("health_token_sha256", "health token fingerprint"),
+        ("api_key_pbkdf2_sha256", "API key verifier"),
+        ("health_token_pbkdf2_sha256", "health token verifier"),
     ],
 )
-def test_credential_rejects_individual_secret_fingerprint_mismatch(
-    tmp_path: Path, fingerprint_name: str, expected_message: str
+def test_credential_rejects_individual_secret_verifier_mismatch(
+    tmp_path: Path, verifier_name: str, expected_message: str
 ) -> None:
     secret = {
         "target_id": "risi-dify-e1",
@@ -150,12 +158,16 @@ def test_credential_rejects_individual_secret_fingerprint_mismatch(
     }
     path = tmp_path / "target-admin.json"
     path.write_text(json.dumps(secret), encoding="utf-8")
-    fingerprints = {
-        "api_key_sha256": credential_sha256_fingerprint(secret["api_key"]),
-        "health_token_sha256": credential_sha256_fingerprint(secret["health_token"]),
+    verifiers = {
+        "api_key_pbkdf2_sha256": credential_pbkdf2_sha256(
+            secret["api_key"], "risi-dify-e1", "api-key"
+        ),
+        "health_token_pbkdf2_sha256": credential_pbkdf2_sha256(
+            secret["health_token"], "risi-dify-e1", "health-token"
+        ),
     }
-    fingerprints[fingerprint_name] = "0" * 64
-    target = _target(**fingerprints)
+    verifiers[verifier_name] = "0" * 64
+    target = _target(**verifiers)
 
     with pytest.raises(OperatorInputError, match=expected_message):
         load_target_credential(path, target)

@@ -32,8 +32,8 @@ writable context.
 
 The harness cannot replace host-level egress enforcement. The `isolated-dify-knowledge` profile
 requires a dedicated controlled target, frozen firewall/VLAN/container state, normal CA and
-hostname verification plus a peer-certificate pin, and separately fingerprinted API and health
-credentials. It does not
+hostname verification plus a peer-certificate pin, and separate PBKDF2-SHA256 API and health
+credential verifiers. It does not
 grant access to other hosts or services. Use host enforcement for every network-capable profile.
 
 E2 validation authority is engineering authority only. It must not be reused as E3 campaign

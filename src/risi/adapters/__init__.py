@@ -5,7 +5,7 @@ from risi.adapters.dify import DifyKnowledgeAdapter
 from risi.adapters.external import (
     ExternalKnowledgeAdapter,
     ExternalTargetManifest,
-    credential_sha256_fingerprint,
+    credential_pbkdf2_sha256,
 )
 from risi.adapters.reference import ReferenceMemoryAdapter
 
@@ -15,5 +15,5 @@ __all__ = [
     "ExternalTargetManifest",
     "MemoryAdapter",
     "ReferenceMemoryAdapter",
-    "credential_sha256_fingerprint",
+    "credential_pbkdf2_sha256",
 ]
