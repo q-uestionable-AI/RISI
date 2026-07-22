@@ -1,0 +1,15 @@
+{
+  "query": {
+    "content": "What obligation applies?"
+  },
+  "records": [
+    {
+      "segment": {
+        "id": "segment-0001",
+        "document_id": "document-0001",
+        "content": "The synthetic obligation remains applicable."
+      },
+      "score": 0.875
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/q-uestionable-AI/RISI/schemas/campaign-manifest.schema.json",
+  "title": "RISI isolated-target campaign manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "campaign_id", "target_manifest_sha256", "input_inventory_sha256",
+    "world_count", "observations_per_world", "total_observations", "top_k",
+    "retrieval_mode", "evidence_relative_path", "expires_on", "validation_only", "metadata"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "campaign_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$" },
+    "target_manifest_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "input_inventory_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "world_count": { "type": "integer", "minimum": 1 },
+    "observations_per_world": { "type": "integer", "minimum": 1 },
+    "total_observations": { "type": "integer", "minimum": 1 },
+    "top_k": { "const": 5 },
+    "retrieval_mode": { "const": "semantic-vector" },
+    "evidence_relative_path": { "type": "string", "minLength": 1 },
+    "expires_on": { "type": "string", "format": "date" },
+    "validation_only": { "type": "boolean" },
+    "metadata": { "type": "object", "additionalProperties": true }
+  }
+}

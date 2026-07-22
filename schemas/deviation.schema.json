@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/q-uestionable-AI/RISI/schemas/deviation.schema.json",
+  "title": "RISI campaign deviation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "campaign_id", "phase", "code", "message", "request_count",
+    "observation_count"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "campaign_id": { "type": "string", "minLength": 1 },
+    "phase": { "type": "string", "minLength": 1 },
+    "code": { "type": "string", "minLength": 1 },
+    "message": { "type": "string" },
+    "request_count": { "type": "integer", "minimum": 0 },
+    "observation_count": { "type": "integer", "minimum": 0 }
+  }
+}

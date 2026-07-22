@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/q-uestionable-AI/RISI/schemas/campaign-result.schema.json",
+  "title": "RISI campaign result summary",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "campaign_id", "status", "world_count", "observation_count", "request_count"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "campaign_id": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["completed", "cancelled", "blocked", "failed"] },
+    "world_count": { "type": "integer", "minimum": 0 },
+    "observation_count": { "type": "integer", "minimum": 0 },
+    "request_count": { "type": "integer", "minimum": 0 }
+  }
+}

@@ -1046,3 +1046,39 @@ def read_verified_report(bundle_path: Path) -> tuple[BundleVerification, str]:
     except (OSError, UnicodeError) as exc:
         raise ArtifactError(f"cannot read report.md: {exc}") from exc
     return verification, report
+
+
+def replay_campaign_bundle(bundle_path: Path) -> dict[str, JsonValue]:
+    """Replay campaign record counts and identities without invoking the target."""
+    verification = verify_evidence_bundle(bundle_path)
+    manifest = load_json_artifact(bundle_path, "campaign-manifest.json")
+    result = load_json_artifact(bundle_path, "result.json")
+    try:
+        observation_lines = (
+            (bundle_path / "observations.jsonl").read_text(encoding="utf-8").splitlines()
+        )
+        evaluation_lines = (
+            (bundle_path / "evaluator-assessments.jsonl").read_text(encoding="utf-8").splitlines()
+        )
+        observations = [json.loads(line) for line in observation_lines if line]
+        evaluations = [json.loads(line) for line in evaluation_lines if line]
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ArtifactError(f"cannot replay campaign JSON Lines: {exc}") from exc
+    if len(observations) != len(evaluations):
+        raise ArtifactError("campaign observation and evaluation counts differ")
+    expected = manifest.get("total_observations")
+    actual = len(observations) * 2
+    if isinstance(expected, bool) or not isinstance(expected, int) or expected != actual:
+        raise ArtifactError("campaign observation count differs from the manifest")
+    if (
+        result.get("observation_count") != actual
+        or result.get("campaign_id") != verification.run_id
+    ):
+        raise ArtifactError("campaign result does not reproduce from retained records")
+    return {
+        "campaign_id": verification.run_id,
+        "observation_count": actual,
+        "record_count": len(observations),
+        "equal": True,
+        "inventory_sha256": verification.inventory_sha256,
+    }

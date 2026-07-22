@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/q-uestionable-AI/RISI/schemas/external-target-manifest.schema.json",
+  "title": "RISI isolated external-target manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "target_id", "profile", "base_url", "server_name",
+    "certificate_sha256", "ca_certificate_path", "api_key_pbkdf2_sha256",
+    "health_token_pbkdf2_sha256",
+    "api_paths", "identities", "request_timeout_seconds", "automatic_retry_count",
+    "indexing_poll_seconds", "indexing_timeout_seconds", "metadata"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "target_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$" },
+    "profile": { "const": "isolated-dify-knowledge" },
+    "base_url": { "type": "string", "pattern": "^https://" },
+    "server_name": { "const": "risi-dify-e1" },
+    "certificate_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "ca_certificate_path": { "type": "string", "minLength": 1 },
+    "api_key_pbkdf2_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "health_token_pbkdf2_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "api_paths": { "$ref": "#/$defs/jsonObject" },
+    "identities": { "$ref": "#/$defs/jsonObject" },
+    "request_timeout_seconds": { "const": 10 },
+    "automatic_retry_count": { "const": 0 },
+    "indexing_poll_seconds": { "const": 1 },
+    "indexing_timeout_seconds": { "const": 300 },
+    "metadata": { "$ref": "#/$defs/jsonObject" }
+  },
+  "$defs": {
+    "jsonObject": { "type": "object", "additionalProperties": { "$ref": "#/$defs/jsonValue" } },
+    "jsonValue": {
+      "oneOf": [
+        { "type": ["string", "number", "integer", "boolean", "null"] },
+        { "type": "array", "items": { "$ref": "#/$defs/jsonValue" } },
+        { "type": "object", "additionalProperties": { "$ref": "#/$defs/jsonValue" } }
+      ]
+    }
+  }
+}

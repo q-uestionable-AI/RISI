@@ -8,10 +8,31 @@ from pathlib import Path
 import typer
 
 from risi import __version__
+from risi.adapters.dify import DifyKnowledgeAdapter
+from risi.adapters.external import load_target_credential
 from risi.artifacts import ArtifactError, verify_evidence_bundle
 from risi.budget import BudgetExhaustedError
+from risi.campaign import (
+    CampaignExecutor,
+    authorize_campaign,
+    campaign_preflight,
+    input_inventory_digest,
+    load_campaign_checkpoint,
+    load_campaign_contracts,
+    load_campaign_worlds,
+    load_evaluator_oracles,
+    prepare_campaign,
+    request_campaign_cancel,
+    retain_preflight_result,
+)
 from risi.canonical import canonical_json
-from risi.evidence import compare_bundles, inspect_bundle, recover_existing_result
+from risi.evidence import (
+    compare_bundles,
+    compare_campaign_bundles,
+    inspect_bundle,
+    inspect_campaign_bundle,
+    recover_existing_result,
+)
 from risi.operator.models import (
     CommandResult,
     OperatorInputError,
@@ -21,18 +42,24 @@ from risi.operator.models import (
     load_run_manifest,
 )
 from risi.operator.safety import PathBoundaryError
-from risi.replay import read_verified_report, replay_bundle
+from risi.replay import read_verified_report, replay_bundle, replay_campaign_bundle
 from risi.runner import (
     SafetyBlockedError,
     capabilities_result,
     run_guarded,
     validate_run,
 )
+from risi.transport import TransportError
 
 app = typer.Typer(
     help="Agent-operable reference harness for Retrieval-Induced State Interference research.",
     no_args_is_help=True,
 )
+campaign_app = typer.Typer(
+    help="Operate an exactly approved isolated-target campaign.",
+    no_args_is_help=True,
+)
+app.add_typer(campaign_app, name="campaign")
 
 
 class ExitCode(IntEnum):
@@ -156,7 +183,7 @@ def _emit_blocked(command: str, exc: SafetyBlockedError, format_name: str) -> No
         status=ResultStatus.BLOCKED,
         data={"authorization": exc.decision.to_json()},
         errors=tuple(
-            ResultError(code=reason, message="denied by the local-reference safety policy")
+            ResultError(code=reason, message="denied by the model-independent safety policy")
             for reason in exc.decision.reason_codes
         ),
     )
@@ -444,3 +471,302 @@ def report_command(
             format_name if format_name in {"text", "json"} else "json",
         )
         raise typer.Exit(ExitCode.INTEGRITY_FAILURE) from exc
+
+
+def _campaign_block_if_needed(command: str, decision: object, format_name: str) -> None:
+    from risi.operator.safety import AuthorizationDecision
+
+    if not isinstance(decision, AuthorizationDecision):
+        raise TypeError("campaign authorization result has an invalid type")
+    if not decision.allowed:
+        _emit_blocked(command, SafetyBlockedError(decision), format_name)
+
+
+def _campaign_error(command: str, exc: Exception, format_name: str) -> None:
+    code = exc.code if isinstance(exc, TransportError) else "invalid_input"
+    status = ResultStatus.ERROR
+    _emit(_error_result(command, status, code, str(exc)), format_name)
+    exit_code = (
+        ExitCode.EXECUTION_FAILURE if isinstance(exc, TransportError) else ExitCode.INVALID_INPUT
+    )
+    raise typer.Exit(exit_code) from exc
+
+
+@campaign_app.command("prepare")
+def campaign_prepare_command(
+    target_path: Path = typer.Argument(..., help="External-target manifest JSON path."),
+    campaign_path: Path = typer.Argument(..., help="Campaign manifest JSON path."),
+    approval_path: Path = typer.Option(..., "--approval", help="Campaign approval JSON path."),
+    workspace: Path = typer.Option(..., "--workspace", help="Operator lifecycle workspace."),
+    format_name: str = typer.Option("text", "--format", help="Output format: text or json."),
+) -> None:
+    """Prepare one exact approved campaign without contacting the target."""
+    try:
+        _validate_format(format_name)
+        target, campaign, approval = load_campaign_contracts(
+            target_path, campaign_path, approval_path
+        )
+        decision = authorize_campaign(campaign, target, approval)
+        _campaign_block_if_needed("campaign-prepare", decision, format_name)
+        checkpoint = prepare_campaign(workspace, campaign, target, approval)
+        _emit(
+            CommandResult(
+                command="campaign-prepare",
+                status=ResultStatus.OK,
+                run_id=campaign.campaign_id,
+                data=checkpoint.to_json(),
+            ),
+            format_name,
+        )
+    except (OperatorInputError, OSError, ValueError) as exc:
+        _campaign_error(
+            "campaign-prepare", exc, format_name if format_name in {"text", "json"} else "json"
+        )
+
+
+@campaign_app.command("preflight")
+def campaign_preflight_command(  # noqa: PLR0913 - CLI exposes independently bound inputs
+    target_path: Path = typer.Argument(..., help="External-target manifest JSON path."),
+    campaign_path: Path = typer.Argument(..., help="Campaign manifest JSON path."),
+    approval_path: Path = typer.Option(..., "--approval", help="Campaign approval JSON path."),
+    credential_path: Path = typer.Option(
+        ..., "--credential", help="Credential file with verifier-bound secrets."
+    ),
+    workspace: Path = typer.Option(..., "--workspace", help="Operator lifecycle workspace."),
+    attempt: int = typer.Option(1, "--attempt", help="Separately retained preflight attempt."),
+    format_name: str = typer.Option("text", "--format", help="Output format: text or json."),
+) -> None:
+    """Run one authorized target identity and health preflight."""
+    try:
+        _validate_format(format_name)
+        target, campaign, approval = load_campaign_contracts(
+            target_path, campaign_path, approval_path
+        )
+        decision = authorize_campaign(campaign, target, approval)
+        _campaign_block_if_needed("campaign-preflight", decision, format_name)
+        credential = load_target_credential(credential_path, target)
+        adapter = DifyKnowledgeAdapter(target, credential)
+        result = campaign_preflight(campaign, target, approval, adapter, attempt=attempt)
+        retained_path = retain_preflight_result(workspace, result)
+        _emit(
+            CommandResult(
+                command="campaign-preflight",
+                status=ResultStatus.OK if result.passed else ResultStatus.ERROR,
+                run_id=campaign.campaign_id,
+                data={**result.to_json(), "retained_path": str(retained_path)},
+            ),
+            format_name,
+        )
+        if not result.passed:
+            raise typer.Exit(ExitCode.EXECUTION_FAILURE)
+    except (OperatorInputError, OSError, TransportError, ValueError) as exc:
+        _campaign_error(
+            "campaign-preflight", exc, format_name if format_name in {"text", "json"} else "json"
+        )
+
+
+@campaign_app.command("status")
+def campaign_status_command(
+    campaign_id: str = typer.Argument(..., help="Campaign identifier."),
+    workspace: Path = typer.Option(..., "--workspace", help="Operator lifecycle workspace."),
+    format_name: str = typer.Option("text", "--format", help="Output format: text or json."),
+) -> None:
+    """Read one retained campaign checkpoint without contacting the target."""
+    try:
+        _validate_format(format_name)
+        checkpoint = load_campaign_checkpoint(workspace, campaign_id)
+        _emit(
+            CommandResult(
+                command="campaign-status",
+                status=ResultStatus.OK,
+                run_id=campaign_id,
+                data=checkpoint,
+            ),
+            format_name,
+        )
+    except (OperatorInputError, OSError, ValueError) as exc:
+        _campaign_error(
+            "campaign-status", exc, format_name if format_name in {"text", "json"} else "json"
+        )
+
+
+@campaign_app.command("cancel")
+def campaign_cancel_command(
+    target_path: Path = typer.Argument(..., help="External-target manifest JSON path."),
+    campaign_path: Path = typer.Argument(..., help="Campaign manifest JSON path."),
+    approval_path: Path = typer.Option(..., "--approval", help="Campaign approval JSON path."),
+    workspace: Path = typer.Option(..., "--workspace", help="Operator lifecycle workspace."),
+    format_name: str = typer.Option("text", "--format", help="Output format: text or json."),
+) -> None:
+    """Request cooperative cancellation under the same campaign authority."""
+    try:
+        _validate_format(format_name)
+        target, campaign, approval = load_campaign_contracts(
+            target_path, campaign_path, approval_path
+        )
+        decision = authorize_campaign(campaign, target, approval)
+        _campaign_block_if_needed("campaign-cancel", decision, format_name)
+        path = request_campaign_cancel(workspace, campaign.campaign_id)
+        _emit(
+            CommandResult(
+                command="campaign-cancel",
+                status=ResultStatus.OK,
+                run_id=campaign.campaign_id,
+                data={"cancellation_path": str(path)},
+            ),
+            format_name,
+        )
+    except (OperatorInputError, OSError, ValueError) as exc:
+        _campaign_error(
+            "campaign-cancel", exc, format_name if format_name in {"text", "json"} else "json"
+        )
+
+
+def _require_campaign_inventory(input_root: Path, expected_sha256: str) -> None:
+    """Reject a private-input inventory that differs from the campaign manifest."""
+    if input_inventory_digest(input_root / "inventory.json") != expected_sha256:
+        raise OperatorInputError("private-input inventory does not match the campaign manifest")
+
+
+@campaign_app.command("execute")
+def campaign_execute_command(  # noqa: PLR0913 - CLI exposes independently bound inputs
+    target_path: Path = typer.Argument(..., help="External-target manifest JSON path."),
+    campaign_path: Path = typer.Argument(..., help="Campaign manifest JSON path."),
+    approval_path: Path = typer.Option(..., "--approval", help="Campaign approval JSON path."),
+    credential_path: Path = typer.Option(
+        ..., "--credential", help="Credential file with verifier-bound secrets."
+    ),
+    input_root: Path = typer.Option(..., "--input-root", help="Frozen private-input directory."),
+    artifact_root: Path = typer.Option(..., "--artifact-root", help="Approved evidence parent."),
+    workspace: Path = typer.Option(..., "--workspace", help="Operator lifecycle workspace."),
+    format_name: str = typer.Option("text", "--format", help="Output format: text or json."),
+) -> None:
+    """Execute one E3-authorized immutable campaign attempt."""
+    try:
+        _validate_format(format_name)
+        target, campaign, approval = load_campaign_contracts(
+            target_path, campaign_path, approval_path
+        )
+        decision = authorize_campaign(campaign, target, approval)
+        _campaign_block_if_needed("campaign-execute", decision, format_name)
+        _require_campaign_inventory(input_root, campaign.input_inventory_sha256)
+        worlds = load_campaign_worlds(input_root / "scenario-worlds.jsonl")
+        oracles = load_evaluator_oracles(input_root / "evaluator-oracles.jsonl")
+        credential = load_target_credential(credential_path, target)
+        adapter = DifyKnowledgeAdapter(target, credential)
+        artifact_root.mkdir(parents=True, exist_ok=True)
+        executor = CampaignExecutor(adapter, request_count=lambda: adapter.request_count)
+        verification = executor.execute(
+            artifact_root, workspace, campaign, target, approval, worlds, oracles
+        )
+        _emit(
+            CommandResult(
+                command="campaign-execute",
+                status=ResultStatus.OK,
+                run_id=campaign.campaign_id,
+                data=verification.to_json(),
+            ),
+            format_name,
+        )
+    except PermissionError as exc:
+        _emit(
+            _error_result("campaign-execute", ResultStatus.BLOCKED, "blocked_by_policy", str(exc)),
+            format_name if format_name in {"text", "json"} else "json",
+        )
+        raise typer.Exit(ExitCode.BLOCKED_BY_POLICY) from exc
+    except (ArtifactError, OperatorInputError, OSError, TransportError, ValueError) as exc:
+        _campaign_error(
+            "campaign-execute", exc, format_name if format_name in {"text", "json"} else "json"
+        )
+
+
+@campaign_app.command("inspect")
+def campaign_inspect_command(
+    bundle_path: Path = typer.Argument(..., help="Campaign evidence-bundle directory."),
+    format_name: str = typer.Option("text", "--format", help="Output format: text or json."),
+) -> None:
+    """Verify and inspect a completed campaign bundle without target access."""
+    try:
+        _validate_format(format_name)
+        summary = inspect_campaign_bundle(bundle_path)
+        _emit(
+            CommandResult(
+                command="campaign-inspect",
+                status=ResultStatus.OK,
+                run_id=summary["campaign_id"] if isinstance(summary["campaign_id"], str) else None,
+                data=summary,
+            ),
+            format_name,
+        )
+    except (ArtifactError, OperatorInputError, OSError, ValueError) as exc:
+        _campaign_error(
+            "campaign-inspect", exc, format_name if format_name in {"text", "json"} else "json"
+        )
+
+
+@campaign_app.command("verify")
+def campaign_verify_command(
+    bundle_path: Path = typer.Argument(..., help="Campaign evidence-bundle directory."),
+    format_name: str = typer.Option("text", "--format", help="Output format: text or json."),
+) -> None:
+    """Verify a campaign bundle and every inventoried file digest."""
+    try:
+        _validate_format(format_name)
+        verification = verify_evidence_bundle(bundle_path)
+        _emit(
+            CommandResult(
+                command="campaign-verify",
+                status=ResultStatus.OK,
+                run_id=verification.run_id,
+                data=verification.to_json(),
+            ),
+            format_name,
+        )
+    except (ArtifactError, OperatorInputError, OSError, ValueError) as exc:
+        _campaign_error(
+            "campaign-verify", exc, format_name if format_name in {"text", "json"} else "json"
+        )
+
+
+@campaign_app.command("compare")
+def campaign_compare_command(
+    first_path: Path = typer.Argument(..., help="First campaign bundle."),
+    second_path: Path = typer.Argument(..., help="Second campaign bundle."),
+    format_name: str = typer.Option("text", "--format", help="Output format: text or json."),
+) -> None:
+    """Compare two verified campaign bundles without target access."""
+    try:
+        _validate_format(format_name)
+        comparison = compare_campaign_bundles(first_path, second_path)
+        _emit(
+            CommandResult(command="campaign-compare", status=ResultStatus.OK, data=comparison),
+            format_name,
+        )
+    except (ArtifactError, OperatorInputError, OSError, ValueError) as exc:
+        _campaign_error(
+            "campaign-compare", exc, format_name if format_name in {"text", "json"} else "json"
+        )
+
+
+@campaign_app.command("replay")
+def campaign_replay_command(
+    bundle_path: Path = typer.Argument(..., help="Campaign evidence-bundle directory."),
+    format_name: str = typer.Option("text", "--format", help="Output format: text or json."),
+) -> None:
+    """Replay a verified campaign bundle without target or model access."""
+    try:
+        _validate_format(format_name)
+        replay = replay_campaign_bundle(bundle_path)
+        _emit(
+            CommandResult(
+                command="campaign-replay",
+                status=ResultStatus.OK,
+                run_id=replay["campaign_id"] if isinstance(replay["campaign_id"], str) else None,
+                data=replay,
+            ),
+            format_name,
+        )
+    except (ArtifactError, OperatorInputError, OSError, ValueError) as exc:
+        _campaign_error(
+            "campaign-replay", exc, format_name if format_name in {"text", "json"} else "json"
+        )

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/q-uestionable-AI/RISI/schemas/external-target-checkpoint.schema.json",
+  "title": "RISI external-target campaign checkpoint",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "campaign_id", "phase", "next_world_index", "observation_count",
+    "request_count", "manifest_sha256", "message"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "campaign_id": { "type": "string", "minLength": 1 },
+    "phase": {
+      "enum": ["prepared", "preflight-passed", "running", "cancelled", "blocked", "failed", "completed"]
+    },
+    "next_world_index": { "type": "integer", "minimum": 0 },
+    "observation_count": { "type": "integer", "minimum": 0 },
+    "request_count": { "type": "integer", "minimum": 0 },
+    "manifest_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "message": { "type": "string" }
+  }
+}

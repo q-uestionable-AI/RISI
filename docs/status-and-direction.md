@@ -22,18 +22,32 @@ workspace configured by the operator.
 - Idempotent completed-run reuse with fail-closed incomplete, tampered, or manifest-mismatched
   final paths.
 - Stable JSON CLI lifecycle discovery, including synchronous A1 support and hard denials.
+- An unreleased additive `isolated-dify-knowledge` profile with pinned standard-library HTTPS,
+  separate PBKDF2-SHA256 API and health credential verifiers, a closed Dify 1.15 Knowledge API
+  allowlist,
+  and zero retries.
+- Exact external-target, campaign, approval, checkpoint, preflight, health, deviation, and result
+  contracts with prepare, preflight, status, cancel, execute, inspect, verify, compare, and replay
+  application services.
+- Fixed E1 geometry checks for 330 worlds, 22 observations per world, 7,260 observations, and
+  primary design power 0.8025. No campaign outcome is present in this repository.
 - Public documentation deployed at <https://risi.q-uestionable.ai>.
 
-## Next direction
+## Current engineering boundary
 
-The next decision is whether the deterministic DEP-01 and DEP-02 reference evidence is sufficient
-to close the current M1 mechanism-recovery gate or needs additional local controls. External
-adapters, local inference servers, optional MCP or skill wrappers, broader defenses, and
-publication work remain later conditional stages.
+The external-target code is bounded to the accepted Dify engineering profile. Target deployment,
+immutable identities, integration evidence, and private input inventories live outside this public
+repository. A full CRAF-T / CRAF-Ret campaign remains unavailable without a separately accepted E3
+approval bound to the exact target manifest, campaign manifest, input inventory, preflight, evidence
+path, expiry, and one-attempt limit.
 
 The implemented A1 surface has no status service, active cancel command, wall-clock experimental
 deadline, automatic retry, or asynchronous job. Cooperative interruption is machine-distinct and
-does not finalize a partial bundle.
+does not finalize a partial bundle. The separate campaign lifecycle has durable status and
+cooperative cancellation records but remains synchronous and has zero automatic retries.
+
+Local or remote generative inference profiles, optional MCP or skill wrappers, broader defenses,
+merge, release, publication, and claims remain separate conditional stages.
 
 No reference-only result establishes an external vulnerability, general prevalence, or a validated
 research claim.

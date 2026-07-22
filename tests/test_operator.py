@@ -129,7 +129,7 @@ def test_obligation_example_uses_its_closed_pure_read_safety_policy() -> None:
 def test_capabilities_list_both_pure_read_decision_providers() -> None:
     profiles = capabilities_result().data["profiles"]
     pure_read_providers = {
-        profile["decision_provider"] for profile in profiles if profile["policy"] == "pure-read"
+        profile["decision_provider"] for profile in profiles if profile.get("policy") == "pure-read"
     }
 
     assert pure_read_providers == {

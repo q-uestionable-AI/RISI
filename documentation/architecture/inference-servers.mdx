@@ -38,6 +38,24 @@ approved. Those controls include:
   provider-retention controls;
 - operator approval bound to the exact target identity and complete resource envelope.
 
+## Implemented knowledge-target profile
+
+`isolated-dify-knowledge` is not an inference profile. It is an additive external memory/retrieval
+profile for one self-hosted Dify 1.15 Knowledge API target. It does not enable a `DecisionProvider`,
+generative model, hosted provider, arbitrary URL, or general network access.
+
+The target manifest binds one HTTPS origin, normal CA and hostname verification, the exact peer
+certificate digest, separate PBKDF2-SHA256 API-key and health-token verifiers, Dify/API identities,
+allowed method/path templates, ten-second request deadline, one-second planned indexing poll,
+300-second
+indexing ceiling, and zero retries. Console, app, workflow, agent, model-management,
+plugin-management, database, vector,
+Ollama, callback, and arbitrary routes are denied by the frozen Nginx and application allowlists.
+
+Campaign execution additionally requires an exact campaign manifest, private-input inventory,
+purpose-specific human approval, preflight, expiry, and attempt ceiling. E2 validation authority
+does not grant E3 campaign authority.
+
 ## Hosted inference endpoints
 
 The preferred future integration is one narrow controlled OpenAI-compatible `DecisionProvider`,
@@ -103,10 +121,10 @@ does not decide the future network contract. A post-M1 design must choose an asy
 or runner-owned blocking boundary that enforces deadlines, cancellation, cleanup, and elapsed-time
 evidence without using wall-clock time as experimental logic.
 
-## Post-M1 acceptance boundary
+## Inference-profile acceptance boundary
 
-An executable inference profile remains blocked until the M1 terminal gate and a separately
-approved implementation package. Deterministic acceptance tests must cover safe public and
+An executable generative inference profile remains blocked pending a separately approved
+implementation package. Deterministic acceptance tests must cover safe public and
 Runpod-shaped endpoints, unsafe literals, private/reserved/mixed resolution, peer mismatch,
 redirects, environment proxies, TLS failures, malformed or oversized responses, secret echoes,
 timeouts, cancellation, retries, budget exhaustion, and authority-bearing identity changes. These
